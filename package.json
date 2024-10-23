@@ -11,10 +11,14 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.2.4",
+    "@google-cloud/pubsub": "^4.8.0",
     "@remix-run/node": "^2.13.1",
     "@remix-run/react": "^2.13.1",
     "@remix-run/serve": "^2.13.1",
+    "@types/pg": "^8.11.10",
     "isbot": "^4.1.0",
+    "pg": "^8.13.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
