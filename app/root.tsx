@@ -2,7 +2,6 @@ import { Auth0Provider } from "@auth0/auth0-react";
 import type { LoaderFunction } from "@remix-run/node";
 import {
   Links,
-  LiveReload,
   Meta,
   Outlet,
   Scripts,
@@ -41,7 +40,6 @@ export default function App() {
         </Auth0Provider>
         <ScrollRestoration />
         <Scripts />
-        <LiveReload />
       </body>
     </html>
   );
