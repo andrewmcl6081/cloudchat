@@ -1,19 +1,25 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { Navigate } from "@remix-run/react";
+import { useNavigate } from "@remix-run/react";
+import { useEffect } from "react";
 
 export default function Login() {
-  const { loginWithRedirect, isAuthenticated, isLoading } = useAuth0();
+  const { loginWithRedirect, isAuthenticated, isLoading, error } = useAuth0();
 
+  useEffect(() => {
+    // Debug log for login state
+    console.log('Login State:', { 
+      isAuthenticated, 
+      isLoading,
+      error: error?.message 
+    });
+  }, [isAuthenticated, isLoading, error]);
+  
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div>Loading...</div>
       </div>
     );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" />;
   }
 
   return (
@@ -27,6 +33,11 @@ export default function Login() {
             Please sign in to continue
           </p>
         </div>
+        {error && (
+        <div className="text-red-600">
+          Error: {error.message}
+        </div>
+      )}
         <button
           onClick={() => loginWithRedirect()}
           className="w-full rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
