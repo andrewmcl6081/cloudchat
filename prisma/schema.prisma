@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,16 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
-  id            String    @id @default(uuid())
-  auth0Id       String    @unique @map("auth0_id")
-  email         String    @unique
-  displayName   String?   @map("display_name")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  
-  // Relations
+  id                        String                    @id @default(uuid())
+  auth0Id                   String                    @unique @map("auth0_id")
+  email                     String                    @unique
+  displayName               String?                   @map("display_name")
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
   participatedConversations ConversationParticipant[]
   sentMessages              Message[]
 
@@ -30,11 +21,9 @@ model User {
 }
 
 model Conversation {
-  id        String    @id @default(uuid())
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  
-  // Relations
+  id           String                    @id @default(uuid())
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
   participants ConversationParticipant[]
   messages     Message[]
 
@@ -42,44 +31,38 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  conversationId String      @map("conversation_id")
-  userId         String      @map("user_id")
-  joinedAt       DateTime    @default(now()) @map("joined_at")
-  
-  // Relations
+  conversationId String       @map("conversation_id")
+  userId         String       @map("user_id")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
   conversation   Conversation @relation(fields: [conversationId], references: [id])
-  user          User         @relation(fields: [userId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
 
   @@id([conversationId, userId])
   @@map("conversation_participants")
 }
 
 model Message {
-  id             String      @id @default(uuid())
-  conversationId String      @map("conversation_id")
-  senderId       String      @map("sender_id")
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
   content        String
-  createdAt      DateTime    @default(now()) @map("created_at")
-  updatedAt      DateTime    @updatedAt @map("updated_at")
-  
-  // Relations
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  sender        User         @relation(fields: [senderId], references: [id])
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
   attachments    Attachment[]
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
 
   @@map("messages")
 }
 
 model Attachment {
-  id          String    @id @default(uuid())
-  messageId   String    @map("message_id")
-  fileName    String    @map("file_name")
-  fileType    String    @map("file_type")
-  storagePath String    @map("storage_path")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  
-  // Relations
-  message     Message   @relation(fields: [messageId], references: [id])
+  id          String   @id @default(uuid())
+  messageId   String   @map("message_id")
+  fileName    String   @map("file_name")
+  fileType    String   @map("file_type")
+  storagePath String   @map("storage_path")
+  createdAt   DateTime @default(now()) @map("created_at")
+  message     Message  @relation(fields: [messageId], references: [id])
 
   @@map("attachments")
 }
