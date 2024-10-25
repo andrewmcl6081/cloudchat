@@ -1,6 +1,7 @@
 import { useAuth0 } from "@auth0/auth0-react";
 import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
+import LoadingSpinner from "~/components/LoadingSpinner";
 
 export default function Login() {
   const { loginWithRedirect, isAuthenticated, isLoading, error } = useAuth0();
@@ -15,11 +16,7 @@ export default function Login() {
   }, [isAuthenticated, isLoading, error]);
   
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div>Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner fullScreen />;
   }
 
   return (

@@ -1,5 +1,5 @@
 import { Auth0Provider } from "@auth0/auth0-react";
-import type { LoaderFunction } from "@remix-run/node";
+import type { LinksFunction, LoaderFunction } from "@remix-run/node";
 import {
   Links,
   Meta,
@@ -8,7 +8,11 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "@remix-run/react";
+import styles from "./tailwind.css?url";
 
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: styles },
+];
 export const loader: LoaderFunction = async () => {
   return {
     env: {
