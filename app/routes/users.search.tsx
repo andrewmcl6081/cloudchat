@@ -1,5 +1,11 @@
+import { User } from "@prisma/client";
 import { json, type LoaderFunction } from "@remix-run/node";
 import { UserService } from "~/services/user.server";
+
+// Define the loader data type
+export type UsersSearchLoaderData = {
+  users: User[];
+};
 
 export const loader: LoaderFunction = async ({ request }) => {
   const url = new URL(request.url);
