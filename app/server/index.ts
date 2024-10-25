@@ -1,11 +1,19 @@
-// app/server/index.ts
 import express from 'express';
 import { createServer } from 'http';
 import { createRequestHandler } from '@remix-run/express';
 import { Server } from 'socket.io';
 import { PubSub } from '@google-cloud/pubsub';
 import { db } from '../services/db/index.server';  // Your existing Prisma client
+import { installGlobals } from '@remix-run/node';
+
 import type { Message } from '@prisma/client';
+import type { ServerBuild } from '@remix-run/node';
+
+// Import build files this way for ES modules
+import * as build from '../../build'
+
+// Install Remix globals
+installGlobals();
 
 // Initialize Express app
 const app = express();
@@ -102,12 +110,12 @@ setupPubSubSubscription().catch(console.error);
 app.all(
   '*',
   createRequestHandler({
-    build: require('../../build'),
+    build: build as unknown as ServerBuild,
     mode: process.env.NODE_ENV,
   })
 );
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 httpServer.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
