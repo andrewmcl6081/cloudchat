@@ -49,8 +49,9 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
    * Handler for user selection
    * Currently only updates local state - will be used for chat initiation later
    */
-  const handleUserSelect = (userId: string) => {
-    onSelect(userId);
+  const handleUserSelect = (auth0Id: string) => {
+    console.log("Selected user auth0Id:", auth0Id);
+    onSelect(auth0Id);
   };
 
   return (
@@ -88,7 +89,7 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
         {fetcher.data?.users?.map((user) => (
           <button
             key={user.id}
-            onClick={() => handleUserSelect(user.id)}
+            onClick={() => handleUserSelect(user.auth0Id)}
             className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 transition-colors ${
               selectedUserId === user.id ? 'bg-blue-50' : ''
             }`}

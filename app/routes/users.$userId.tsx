@@ -1,23 +1,32 @@
 import { json, type LoaderFunction } from "@remix-run/node";
 import { UserService } from "~/services/user.server";
-import { User } from "@prisma/client";
+import type { User } from "@prisma/client";
 
-// Define the type for the loader data
 export type UserLoaderData = {
   user: User;
 };
 
 export const loader: LoaderFunction = async ({ params }) => {
-  // Check if userId exists
-  if (!params.userId) {
-    throw new Response("User ID is required", { status: 400 });
-  }
-
-  const user = await UserService.findById(params.userId);
+  const auth0Id = params.userId;
   
-  if (!user) {
-    throw new Response("User not found", { status: 404 });
+  if (!auth0Id) {
+    throw json({ error: "Auth0 ID is required" }, { status: 400 });
   }
 
-  return json<UserLoaderData>({ user });
+  try {
+    // Use UserService to find user by Auth0 ID
+    const user = await UserService.findByAuth0Id(auth0Id);
+    
+    if (!user) {
+      throw json({ error: "User not found" }, { status: 404 });
+    }
+
+    return json<UserLoaderData>({ user });
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    throw json(
+      { error: "Failed to load user" },
+      { status: 500 }
+    );
+  }
 };

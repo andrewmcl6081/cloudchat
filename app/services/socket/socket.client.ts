@@ -1,33 +1,24 @@
 // app/services/socket/socket.client.ts
 import { io, Socket } from 'socket.io-client';
-import type { Message } from '@prisma/client';
+import type { MessageWithSender } from '~/services/message.server';
 
-// We'll use this to avoid redefining type shapes
-export type NewMessageData = {
-  conversationId: string;
-  senderId: string;
-  content: string;
-};
+export type MessageHandler = (message: MessageWithSender) => void;
 
 class SocketService {
   private socket: Socket | null = null;
-  private messageHandlers: ((message: Message) => void)[] = [];
+  private messageHandlers: Set<MessageHandler> = new Set();
 
-  // Initialize socket connection
   connect() {
     if (!this.socket) {
-      // Connect to same URL as our Express server
       this.socket = io({
         autoConnect: true,
         reconnection: true,
       });
 
-      // Set up message handler
-      this.socket.on('new-message', (message: Message) => {
+      this.socket.on('new-message', (message: MessageWithSender) => {
         this.messageHandlers.forEach(handler => handler(message));
       });
 
-      // Handle connection errors
       this.socket.on('connect_error', (error) => {
         console.error('Socket connection error:', error);
       });
@@ -35,37 +26,37 @@ class SocketService {
     return this.socket;
   }
 
-  // Join a specific chat conversation
   joinConversation(conversationId: string) {
     if (this.socket) {
       this.socket.emit('join-conversation', conversationId);
     }
   }
 
-  // Send a new message
-  sendMessage(message: NewMessageData) {
+  sendMessage(message: {
+    conversationId: string;
+    senderId: string;
+    content: string;
+  }) {
     if (this.socket) {
       this.socket.emit('send-message', message);
     }
   }
 
-  // Subscribe to new messages
-  onNewMessage(handler: (message: Message) => void) {
-    this.messageHandlers.push(handler);
-    // Return cleanup function
-    return () => {
-      this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-    };
+  onNewMessage(handler: MessageHandler) {
+    this.messageHandlers.add(handler);
   }
 
-  // Cleanup on component unmount
+  removeMessageListener(handler: MessageHandler) {
+    this.messageHandlers.delete(handler);
+  }
+
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.messageHandlers.clear();
   }
 }
 
-// Export singleton instance
 export const socketService = new SocketService();

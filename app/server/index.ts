@@ -4,13 +4,14 @@ import { createServer } from 'http';
 import { createRequestHandler } from '@remix-run/express';
 import type { ServerBuild } from '@remix-run/node';
 import * as build from '../../build/index.js';
-import { SocketServer } from './socket.server.js';
+import { SocketServer } from './socket.server';
 
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.IO
-new SocketServer(httpServer);
+// Initialize Socket.IO as singleton
+const socketServer = SocketServer.getInstance();
+socketServer.initialize(httpServer);
 
 // Serve static files
 app.use(express.static('public'));

@@ -7,24 +7,79 @@ export interface MessageWithSender extends Message {
 
 export class MessageService {
   /**
-   * Create a new message and save it to the database
+   * Get or create a conversation between two users
+   * @param auth0Id1 - First user's Auth0 ID
+   * @param auth0Id2 - Second user's Auth0 ID
    */
-  static async createMessage(data: {
-    conversationId: string;
-    senderId: string;
-    content: string;
-  }): Promise<MessageWithSender> {
-    return db.message.create({
-      data,
-      include: {
-        sender: true,
-      },
+  static async getOrCreateConversation(
+    auth0Id1: string,
+    auth0Id2: string
+  ): Promise<string> {
+    // First get both users by their Auth0 IDs
+    const dbUsers = await db.user.findMany({
+      where: {
+        auth0Id: {
+          in: [auth0Id1, auth0Id2]
+        }
+      }
     });
+
+    console.log("Found DB users:", dbUsers); // Debug log
+
+    if (dbUsers.length !== 2) {
+      throw new Error("One or both users not found");
+    }
+
+    // Get their database IDs
+    const [user1, user2] = dbUsers;
+
+    // Look for existing conversation
+    const existingConversation = await db.conversation.findFirst({
+      where: {
+        AND: [
+          {
+            participants: {
+              some: {
+                userId: user1.id
+              }
+            }
+          },
+          {
+            participants: {
+              some: {
+                userId: user2.id
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    if (existingConversation) {
+      return existingConversation.id;
+    }
+
+    // Create new conversation
+    const newConversation = await db.conversation.create({
+      data: {
+        participants: {
+          createMany: {
+            data: [
+              { userId: user1.id },
+              { userId: user2.id }
+            ]
+          }
+        }
+      },
+      include: {
+        participants: true
+      }
+    });
+
+    console.log("Created new conversation:", newConversation); // Debug log
+    return newConversation.id;
   }
 
-  /**
-   * Fetch messages for a specific conversation
-   */
   static async getConversationMessages(
     conversationId: string
   ): Promise<MessageWithSender[]> {
@@ -41,39 +96,29 @@ export class MessageService {
     });
   }
 
-  /**
-   * Get or create a conversation between two users
-   */
-  static async getOrCreateConversation(
-    user1Id: string,
-    user2Id: string
-  ): Promise<string> {
-    // First, try to find an existing conversation
-    const existingConversation = await db.conversation.findFirst({
-      where: {
-        AND: [
-          { participants: { some: { userId: user1Id } } },
-          { participants: { some: { userId: user2Id } } },
-        ],
-      },
+  static async createMessage(data: {
+    conversationId: string;
+    senderId: string; // This is Auth0 ID
+    content: string;
+  }): Promise<MessageWithSender> {
+    // Get the user's database ID from their Auth0 ID
+    const user = await db.user.findUnique({
+      where: { auth0Id: data.senderId }
     });
 
-    if (existingConversation) {
-      return existingConversation.id;
+    if (!user) {
+      throw new Error("Sender not found");
     }
 
-    // If no conversation exists, create a new one
-    const newConversation = await db.conversation.create({
+    return db.message.create({
       data: {
-        participants: {
-          create: [
-            { userId: user1Id },
-            { userId: user2Id },
-          ],
-        },
+        content: data.content,
+        conversationId: data.conversationId,
+        senderId: user.id // Use database ID
+      },
+      include: {
+        sender: true,
       },
     });
-
-    return newConversation.id;
   }
 }
