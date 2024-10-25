@@ -2,21 +2,22 @@ import { useState, useEffect } from 'react';
 import { useFetcher } from '@remix-run/react';
 import { Search, User as UserIcon } from 'lucide-react';
 import { useAuth0 } from "@auth0/auth0-react";
-import type { User } from "@prisma/client";
 import type { UsersSearchLoaderData } from '~/routes/users.search';
-import type { SerializeFrom } from '@remix-run/node';
 import LoadingSpinner from '~/components/LoadingSpinner';
+
+interface UserListProps {
+  selectedUserId: string | null;
+  onSelect: (userId: string) => void;
+}
 
 /**
  * UserList Component
  * Displays a searchable list of users with email-based search functionality.
  * Positioned on the left side of the dashboard, allows user selection for chat initiation.
  */
-export default function UserList() {
+export default function UserList({ selectedUserId, onSelect }: UserListProps) {
   // State for managing the email search input
   const [emailQuery, setEmailQuery] = useState('');
-  // State for tracking which user is currently selected
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   // Fetcher for making API requests without navigation
   const fetcher = useFetcher<UsersSearchLoaderData>();
   // Get current user from Auth0
@@ -49,7 +50,7 @@ export default function UserList() {
    * Currently only updates local state - will be used for chat initiation later
    */
   const handleUserSelect = (userId: string) => {
-    setSelectedUserId(userId);
+    onSelect(userId);
   };
 
   return (
