@@ -33,7 +33,7 @@ export default function Dashboard() {
         formData,  // FormData object instead of plain object
         { 
           method: "post",  // Use POST method
-          action: "/auth/sync"  // Endpoint to handle the sync
+          action: "/api/auth/sync"  // Endpoint to handle the sync
         }
       );
     }

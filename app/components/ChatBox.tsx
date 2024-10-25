@@ -74,7 +74,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         },
         { 
           method: 'post',
-          action: '/conversations/create'
+          action: '/api/conversations/create'
         }
       );
     }
@@ -146,7 +146,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         formData,
         { 
           method: 'post',
-          action: '/conversations/create'
+          action: '/api/conversations/create'
         }
       );
     }
@@ -169,7 +169,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       },
       { 
         method: 'post',
-        action: '/messages/create'
+        action: '/api/messages/create'
       }
     );
 

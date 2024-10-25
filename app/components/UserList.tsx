@@ -37,7 +37,7 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
         searchParams.set('email', emailQuery);
         searchParams.set('currentUserId', user.sub);
         
-        fetcher.load(`/users/search?${searchParams.toString()}`);
+        fetcher.load(`/api/users/search?${searchParams.toString()}`);
       }
     }, 300);
 
