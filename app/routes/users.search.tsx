@@ -7,6 +7,7 @@ export type UsersSearchLoaderData = {
   users: User[];
 };
 
+// Resource Route (GET requests using loaders)
 export const loader: LoaderFunction = async ({ request }) => {
   const url = new URL(request.url);
   const email = url.searchParams.get("email") || "";

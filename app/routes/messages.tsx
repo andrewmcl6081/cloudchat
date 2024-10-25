@@ -2,7 +2,7 @@ import { json, type LoaderFunction } from "@remix-run/node";
 import { MessageService } from "~/services/message.server";
 
 /**
- * GET /api/messages
+ * Resource Route (GET requests using loaders)
  * Fetches messages for a specific conversation
  */
 export const loader: LoaderFunction = async ({ request }) => {

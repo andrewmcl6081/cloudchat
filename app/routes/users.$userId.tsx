@@ -6,6 +6,7 @@ export type UserLoaderData = {
   user: User;
 };
 
+// Resource Routes(GET requests using loaders)
 export const loader: LoaderFunction = async ({ params }) => {
   const auth0Id = params.userId;
   
