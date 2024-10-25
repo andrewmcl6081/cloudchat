@@ -1,14 +1,19 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
 import UserList from "~/components/UserList";
+import ChatBox from "~/components/ChatBox";
+import { User } from "@prisma/client";
+import { UsersSearchLoaderData } from "./users.search";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0
   const { user, logout } = useAuth0();
   // Initialize fetcher for making POST requests without navigation
   const fetcher = useFetcher();
+  // Add state for selected user ID
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     // Only attempt to sync if we have the required user data
@@ -59,14 +64,14 @@ export default function Dashboard() {
         </nav>
         {/* Main Content Area */}
         <div className="flex h-[calc(100vh-4rem)]">
-          {/* User List Sidebar */}
-          <UserList />
-          
-          {/* Main Chat Area - Will be replaced with chat interface later */}
-          <main className="flex-1 p-6">
-            <div className="flex items-center justify-center h-full text-gray-500">
-              <p>Select a user to start chatting</p>
-            </div>
+          <UserList
+            selectedUserId={selectedUserId}
+            onSelect={setSelectedUserId}
+          />
+          <main className="flex-1">
+            <ChatBox
+              selectedUserId={selectedUserId}
+            />
           </main>
         </div>
       </div>
