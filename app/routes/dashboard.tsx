@@ -2,6 +2,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
+import UserList from "~/components/UserList";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0
@@ -56,10 +57,18 @@ export default function Dashboard() {
             </div>
           </div>
         </nav>
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold">Welcome, {user?.name || user?.email}!</h2>
-          {/* Add your chat interface here */}
-        </main>
+        {/* Main Content Area */}
+        <div className="flex h-[calc(100vh-4rem)]">
+          {/* User List Sidebar */}
+          <UserList />
+          
+          {/* Main Chat Area - Will be replaced with chat interface later */}
+          <main className="flex-1 p-6">
+            <div className="flex items-center justify-center h-full text-gray-500">
+              <p>Select a user to start chatting</p>
+            </div>
+          </main>
+        </div>
       </div>
     </RequireAuth>
   );
