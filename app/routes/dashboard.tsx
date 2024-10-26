@@ -4,8 +4,6 @@ import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
 import UserList from "~/components/UserList";
 import ChatBox from "~/components/ChatBox";
-import { User } from "@prisma/client";
-import { UsersSearchLoaderData } from "./users.search";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0
@@ -18,14 +16,20 @@ export default function Dashboard() {
   useEffect(() => {
     // Only attempt to sync if we have the required user data
     if (user?.sub && user?.email) {
+
       // Create FormData object - this is what Remix expects
       const formData = new FormData();
+
       // Add user data to FormData
       formData.append("sub", user.sub);
       formData.append("email", user.email);
-      // Only append name if it exists
+
       if (user.name) {
         formData.append("name", user.name);
+      }
+
+      if (user.picture) {
+        formData.append("picture", user.picture);
       }
 
       // Submit the FormData to our sync endpoint
@@ -37,6 +41,7 @@ export default function Dashboard() {
         }
       );
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]); // Re-run effect if user object changes
 
   return (
