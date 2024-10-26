@@ -7,6 +7,7 @@ export const action: ActionFunction = async ({ request }) => {
     const sub = formData.get("sub");
     const email = formData.get("email");
     const name = formData.get("name");
+    const picture = formData.get("picture");
 
     if (!sub || !email) {
       return json(
@@ -19,6 +20,7 @@ export const action: ActionFunction = async ({ request }) => {
       sub: sub.toString(),
       email: email.toString(),
       name: name?.toString(),
+      picture: picture?.toString(),
     });
 
     return json({ user });
