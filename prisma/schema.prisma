@@ -12,6 +12,9 @@ model User {
   auth0Id                   String                    @unique @map("auth0_id")
   email                     String                    @unique
   displayName               String?                   @map("display_name")
+  picture                   String?                   
+  isOnline                  Boolean                   @default(false)
+  lastActive                DateTime                  @default(now())
   createdAt                 DateTime                  @default(now()) @map("created_at")
   updatedAt                 DateTime                  @updatedAt @map("updated_at")
   participatedConversations ConversationParticipant[]
