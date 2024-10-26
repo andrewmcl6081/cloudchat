@@ -14,6 +14,7 @@ export type Auth0User = {
 };
 
 export class UserService {
+  
   /**
    * Finds an existing user by Auth0 ID or creates a new one
    * This is typically called after Auth0 authentication
@@ -24,17 +25,33 @@ export class UserService {
       where: { 
         auth0Id: auth0User.sub 
       },
+
       // If user exists, update their information
       update: {
         email: auth0User.email,
         displayName: auth0User.name,
+        picture: auth0User.picture,
       },
+
       // If user doesn't exist, create new record
       create: {
         auth0Id: auth0User.sub,
         email: auth0User.email,
         displayName: auth0User.name,
       },
+    });
+  }
+
+  static async getAllUsers(currentUserId: string) {
+    return await db.user.findMany({
+      where: {
+        auth0Id: {
+          not: currentUserId
+        }
+      },
+      orderBy: {
+        email: "asc"
+      }
     });
   }
 
@@ -79,30 +96,6 @@ export class UserService {
     return db.user.update({
       where: { id: userId },
       data,
-    });
-  }
-
-  /**
-   * Searches for users by name or email
-   * Useful for user discovery/search features
-   * Excludes the current user from results
-   */
-  static async searchUsers(
-    query: string,
-    currentUserId: string,
-    limit: number = 10
-  ): Promise<User[]> {
-    return db.user.findMany({
-      where: {
-        OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          { displayName: { contains: query, mode: 'insensitive' } },
-        ],
-        AND: {
-          id: { not: currentUserId }, // Exclude current user
-        },
-      },
-      take: limit,
     });
   }
 
