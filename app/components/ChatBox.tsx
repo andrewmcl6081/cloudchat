@@ -1,10 +1,10 @@
 // app/components/ChatBox.tsx
 import React, { useEffect, useState, useRef } from 'react';
-import { User } from 'lucide-react';
+import { ReceiptRussianRuble, User } from 'lucide-react';
 import { useFetcher } from '@remix-run/react';
 import { useAuth0 } from "@auth0/auth0-react";
 import LoadingSpinner from '~/components/LoadingSpinner';
-import { UserLoaderData } from '~/routes/users.$userId';
+import { UserLoaderData } from '~/routes/api.users.$userId';
 import { socketService } from '~/services/socket/socket.client';
 import type { MessageWithSender } from '~/services/message.server';
 
@@ -21,13 +21,31 @@ interface ChatBoxProps {
   selectedUserId: string | null;
 }
 
+interface MessageWithSender {
+  id: string;
+  content: string;
+  conversationId: string;
+  senderId: string;
+  createdAt: string | Date;  // Accept either string or Date
+  updatedAt: string | Date;  // Accept either string or Date
+  sender: {
+    id: string;
+    email: string;
+    auth0Id: string;
+    displayName: string | null;
+    picture: string | null;
+    createdAt: string | Date;  // Accept either string or Date
+    updatedAt: string | Date;  // Accept either string or Date
+    lastActive: string | Date; // Accept either string or Date
+  };
+}
+
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers with proper type definitions
   const userFetcher = useFetcher<UserLoaderData>();
   const messageFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher();
-  
   const { user } = useAuth0();
   
   // Component state
@@ -39,118 +57,107 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Reference for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  /**
-   * Automatically scroll to the bottom of the message list
-   * when new messages arrive
-   */
+  // Automatically scroll to the bottom of the message list
+  // when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  /**
-   * Initialize Socket.IO connection when component mounts
-   * Clean up connection when component unmounts
-   */
+  // handle initial chat setup
   useEffect(() => {
-    const socket = socketService.connect();
-    setIsConnected(true);
 
-    return () => {
-      socketService.disconnect();
-      setIsConnected(false);
-    };
-  }, []);
+    // Exit if we dont have necessary data
+    if (!selectedUserId || !user?.sub) {
+      // Reset state when no user is selected or no current user
+      setMessages([]);
+      setConversationId(null);
 
-  /**
-   * Create or retrieve conversation when users are selected
-   * Triggers when either user changes or when socket connects
-   */
-  useEffect(() => {
-    if (selectedUserId && user?.sub && isConnected) {
-      messageFetcher.submit(
-        { 
-          userId1: user.sub,
-          userId2: selectedUserId,
-        },
-        { 
-          method: 'post',
-          action: '/api/conversations/create'
+      return;
+    }
+
+    const initializeChat = async () => {
+      console.group("Chat Intialization Flow");
+      try {
+        // Connect to WebSocket
+        socketService.connect();
+        setIsConnected(true);
+
+        // Load selected user's profile
+        userFetcher.load(`/api/users/${selectedUserId}`);
+        console.log("Loading user details:", selectedUserId);
+
+        // Create or get conversation between users
+        if (selectedUserId && user?.sub) {
+          messageFetcher.submit(
+            {
+              userId1: user.sub,
+              userId2: selectedUserId
+            },
+            {
+              method: "post",
+              action: "/api/conversations/create"
+            }
+          );
+
+          console.log("Conversation request submitted");
         }
-      );
+      } catch (error) {
+        console.error("Initialization error:", error);
+      }
+      console.groupEnd();
     }
-  }, [selectedUserId, user?.sub, isConnected]);
 
-  /**
-   * Handle conversation initialization after getting conversationId
-   * Joins the socket room and fetches existing messages
-   */
-  useEffect(() => {
-    const response = messageFetcher.data as ConversationResponse | undefined;
-    if (response?.conversationId) {
-      setConversationId(response.conversationId);
-      socketService.joinConversation(response.conversationId);
-      messagesFetcher.load(`/messages?conversationId=${response.conversationId}`);
+    initializeChat();
+
+    // Cleanup: Leave conversation when unmounting or changing users
+    return () => {
+      if (conversationId) {
+        socketService.leaveConversation(conversationId);
+        setIsConnected(false);
+        console.log("Left conversation:", conversationId);
+      }
     }
+  }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
+
+  useEffect(() => {
+    //Check if we have conversation data from the API
+    const response = messageFetcher.data;
+    if (!response?.conversationId) return;
+
+    console.group("Conversation Setup Flow");
+    console.log("Setting up conversation:", response.conversationId);
+
+    // Store conversation ID in state
+    setConversationId(response.conversationId);
+
+    // Join the WebSocket room for this conversation
+    socketService.joinConversation(response.conversationId);
+
+    // Load existing messages
+    messagesFetcher.load(`/api/messages/${response.conversationId}`);
+    console.log("Requested messages for conversation:", response.conversationId);
+    console.groupEnd();
   }, [messageFetcher.data]);
 
-  /**
-   * Update messages state when new messages are fetched
-   * Handles both initial load and new messages
-   */
   useEffect(() => {
-    const response = messagesFetcher.data as MessagesResponse | undefined;
+    console.group("Message Loading Flow");
+    console.log("MessagesFetcher State:", messagesFetcher.state);
+    console.log("MessagesFetcher Data:", messagesFetcher.data);
+
+    if (messagesFetcher.state === "loading") {
+      console.log("Loading Messages...");
+      return;
+    }
+
+    const response = messagesFetcher.data;
     if (response?.messages) {
+      console.log("Updating messages:", response.messages.length);
       setMessages(response.messages);
       scrollToBottom();
     }
+
+    console.groupEnd();
   }, [messagesFetcher.data]);
-
-  /**
-   * Socket.IO message listener
-   * Updates messages state when new messages arrive in real-time
-   */
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const handleNewMessage = (message: MessageWithSender) => {
-      setMessages(prev => [...prev, message]);
-      scrollToBottom();
-    };
-
-    socketService.onNewMessage(handleNewMessage);
-
-    // Cleanup socket listener on unmount or when connection status changes
-    return () => {
-      socketService.removeMessageListener(handleNewMessage);
-    };
-  }, [isConnected]);
-
-  useEffect(() => {
-    if (selectedUserId && user?.sub && isConnected) {
-      console.log("Starting chat with users:", {
-        currentUser: {
-          sub: user.sub,
-          email: user.email
-        },
-        selectedUser: selectedUserId
-      });
-      
-      userFetcher.load(`/users/${selectedUserId}`);
-
-      // Make sure we're sending both IDs
-      const formData = new FormData();
-      formData.append("userId1", user.sub);
-      formData.append("userId2", selectedUserId);
-  
-      messageFetcher.submit(
-        formData,
-        { 
-          method: 'post',
-          action: '/api/conversations/create'
-        }
-      );
-    }
-  }, [selectedUserId, user?.sub, isConnected]);
 
   /**
    * Handle message submission

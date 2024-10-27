@@ -5,10 +5,8 @@ import { MessageService } from "~/services/message.server";
  * Resource Route (GET requests using loaders)
  * Fetches messages for a specific conversation
  */
-export const loader: LoaderFunction = async ({ request }) => {
-
-  const url = new URL(request.url);
-  const conversationId = url.searchParams.get("conversationId");
+export const loader: LoaderFunction = async ({ params }) => {
+  const conversationId = params.conversationId;
 
   if (!conversationId) {
     throw json(

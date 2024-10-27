@@ -2,14 +2,12 @@
 import { json, type ActionFunction } from "@remix-run/node";
 import { MessageService } from "~/services/message.server";
 import { SocketServer } from "~/server/socket.server";
-import { PubSubService } from "~/services/pubsub/pubsub.server";
 
 /**
  * POST /api/messages/create
  * Creates a new message and broadcasts it via Socket.IO
  */
 export const action: ActionFunction = async ({ request }) => {
-
   const formData = await request.formData();
   const content = formData.get("content");
   const conversationId = formData.get("conversationId");
@@ -34,18 +32,8 @@ export const action: ActionFunction = async ({ request }) => {
     // Initialize services
     const socketServer = SocketServer.getInstance();
 
-    const pubsub = new PubSubService();
-
     // Broadcast message via Socket.IO
     socketServer.emit('new-message', conversationId.toString(), message);
-
-    // Publish to Pub/Sub for background processing
-    await pubsub.publishMessage('new-message', {
-      messageId: message.id,
-      conversationId: message.conversationId,
-      senderId: message.senderId,
-      content: message.content,
-    });
 
     return json({ message });
   } catch (error) {

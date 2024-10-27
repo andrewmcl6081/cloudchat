@@ -8,13 +8,6 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Debug log to see auth state
-    console.log('Auth State:', { 
-      isAuthenticated, 
-      isLoading, 
-      error: error?.message 
-    });
-
     if (!isLoading && !isAuthenticated) {
       navigate("/login");
     }

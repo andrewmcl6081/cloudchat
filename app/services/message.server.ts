@@ -11,10 +11,8 @@ export class MessageService {
    * @param auth0Id1 - First user's Auth0 ID
    * @param auth0Id2 - Second user's Auth0 ID
    */
-  static async getOrCreateConversation(
-    auth0Id1: string,
-    auth0Id2: string
-  ): Promise<string> {
+  static async getOrCreateConversation(auth0Id1: string, auth0Id2: string): Promise<string> {
+    
     // First get both users by their Auth0 IDs
     const dbUsers = await db.user.findMany({
       where: {
