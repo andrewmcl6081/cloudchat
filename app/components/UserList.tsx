@@ -4,17 +4,16 @@ import { Search, User as UserIcon } from 'lucide-react';
 import { useAuth0 } from "@auth0/auth0-react";
 import LoadingSpinner from '~/components/LoadingSpinner';
 import { User } from '@prisma/client';
+import { SerializeFrom } from "@remix-run/node";
 
 interface UserListProps {
   selectedUserId: string | null;
   onSelect: (userId: string) => void;
 }
 
-type ApiUser = Omit<User, "lastActive" | "createdAt" | 'updatedAt'> & {
-  lastActive: string;
-  createdAt: string;
-  updatedAt: string;
-};
+interface UsersSearchResponse {
+  users: SerializeFrom<User>[];
+}
 
 /**
  * UserList Component
@@ -23,8 +22,8 @@ type ApiUser = Omit<User, "lastActive" | "createdAt" | 'updatedAt'> & {
  */
 export default function UserList({ selectedUserId, onSelect }: UserListProps) {
   const [searchInput, setSearchInput] = useState('');
-  const [allUsers, setAllUsers] = useState<ApiUser[]>([]);
-  const fetcher = useFetcher<{ users: ApiUser[] }>();
+  const [allUsers, setAllUsers] = useState<SerializeFrom<User>[]>([]);
+  const fetcher = useFetcher<UsersSearchResponse>();
   const { user } = useAuth0();
 
   // Fetch all users once when component mounts
@@ -44,15 +43,14 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
 
   // Get filtered users only when query is 3+ characters
   const filteredUsers = searchInput.length >= 3
-  ? allUsers.filter(u => 
-    u.email.toLowerCase().includes(searchInput.toLowerCase()) ||
-    (u.displayName && u.displayName.toLowerCase().includes(searchInput.toLowerCase()))
-  ) : [];
+    ? allUsers.filter(u => 
+        u.email.toLowerCase().includes(searchInput.toLowerCase()) ||
+        (u.displayName && u.displayName.toLowerCase().includes(searchInput.toLowerCase()))
+      ) 
+    : [];
 
-  /**
-   * Handler for user selection
-   * Currently only updates local state - will be used for chat initiation later
-   */
+  // Handler for user selection
+  //Currently only updates local state - will be used for chat initiation later
   const handleUserSelect = (auth0Id: string) => {
     console.log("Selected user auth0Id:", auth0Id);
     onSelect(auth0Id);
