@@ -42,6 +42,7 @@ export class SocketServer {
     this.log('SocketServer constructor called');
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private log(...args: any[]) {
     if (this.debugMode) {
       console.log("[Server Socket Service]", ...args);

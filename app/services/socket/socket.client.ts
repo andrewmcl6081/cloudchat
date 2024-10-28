@@ -39,6 +39,7 @@ export class SocketService {
     console.log("Client Socket service initialized");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private log(...args: any[]) {
     if (this.debugMode) {
       console.log("[Client Socket Service]", ...args);
