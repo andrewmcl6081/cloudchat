@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ReceiptRussianRuble, User } from 'lucide-react';
 import { useFetcher } from '@remix-run/react';
 import { useAuth0 } from "@auth0/auth0-react";
+import { SerializeFrom } from "@remix-run/node";
 import LoadingSpinner from '~/components/LoadingSpinner';
 import { UserLoaderData } from '~/routes/api.users.$userId';
 import { socketService } from '~/services/socket/socket.client';
@@ -21,25 +22,6 @@ interface ChatBoxProps {
   selectedUserId: string | null;
 }
 
-interface MessageWithSender {
-  id: string;
-  content: string;
-  conversationId: string;
-  senderId: string;
-  createdAt: string | Date;  // Accept either string or Date
-  updatedAt: string | Date;  // Accept either string or Date
-  sender: {
-    id: string;
-    email: string;
-    auth0Id: string;
-    displayName: string | null;
-    picture: string | null;
-    createdAt: string | Date;  // Accept either string or Date
-    updatedAt: string | Date;  // Accept either string or Date
-    lastActive: string | Date; // Accept either string or Date
-  };
-}
-
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers with proper type definitions
   const userFetcher = useFetcher<UserLoaderData>();
@@ -49,7 +31,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const { user } = useAuth0();
   
   // Component state
-  const [messages, setMessages] = useState<MessageWithSender[]>([]);
+  const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -63,22 +45,36 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // handle initial chat setup
-  useEffect(() => {
-
-    // Exit if we dont have necessary data
-    if (!selectedUserId || !user?.sub) {
-      // Reset state when no user is selected or no current user
+  // Handle cleanup when user changes or logs out
+  const cleanup = (currentConversationId: string | null) => {
+    if (currentConversationId) {
+      console.log("Cleaning up conversation:", currentConversationId);
+      socketService.leaveConversation(currentConversationId);
       setMessages([]);
       setConversationId(null);
+      setIsConnected(false);
+      setMessageInput("");
+    }
+  }
 
+  // handle initial chat setup
+  useEffect(() => {
+    // Store current conversationId for cleanup
+    const currentConvId = conversationId;
+
+    // Exit and clean up if we dont have necessary data
+    if (!selectedUserId || !user?.sub) {
+      cleanup(currentConvId);
       return;
     }
 
     const initializeChat = async () => {
       console.group("Chat Intialization Flow");
       try {
-        // Connect to WebSocket
+        // First cleanup any existing conversation
+        cleanup(currentConvId);
+
+        // Connect to WebSocket (initialize new conversation)
         socketService.connect();
         setIsConnected(true);
 
@@ -111,11 +107,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     // Cleanup: Leave conversation when unmounting or changing users
     return () => {
-      if (conversationId) {
-        socketService.leaveConversation(conversationId);
-        setIsConnected(false);
-        console.log("Left conversation:", conversationId);
-      }
+      cleanup(currentConvId);
     }
   }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
 
@@ -149,21 +141,73 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       return;
     }
 
-    const response = messagesFetcher.data;
-    if (response?.messages) {
-      console.log("Updating messages:", response.messages.length);
-      setMessages(response.messages);
+    if (messagesFetcher.data?.messages) {
+      console.log("Updating messages:", messagesFetcher.data.messages);
+      setMessages(messagesFetcher.data.messages);
       scrollToBottom();
     }
 
     console.groupEnd();
   }, [messagesFetcher.data]);
 
-  /**
-   * Handle message submission
-   * Saves message to database and emits through socket
-   */
+  useEffect(() => {
+    if (!isConnected) return;
+
+    // Handler for real-time messages
+    const handleNewMessage = (message: SerializeFrom<MessageWithSender>) => {
+      console.log("Received real-time message:", message);
+
+      setMessages(prevMessages => {
+        // Check if message already exists to prevent duplicates
+        const messageExists = prevMessages.some(m => m.id === message.id);
+        if (messageExists) {
+          return prevMessages;
+        }
+        return [...prevMessages, message];
+      });
+
+      scrollToBottom();
+    };
+
+    // Add handler for when users leave the conversation
+    const handleUserLeft = (data: { userId: string, conversationId: string}) => {
+      console.log("User left chat:", data);
+    }
+
+    // Register handlers
+    socketService.onNewMessage(handleNewMessage);
+    socketService.onUserLeft(handleUserLeft);
+
+    // Cleanup listener when component unmounts or connection changes
+    return () => {
+      socketService.removeMessageHandler(handleNewMessage);
+      socketService.removeUserLeftHandler(handleUserLeft);
+    };
+  }, [isConnected]);
+
+  // Handle user logout
+  useEffect(() => {
+    const handleLogout = () => {
+      if (conversationId) {
+        console.log("Logging out, leaving conversation:", conversationId);
+        socketService.leaveConversation(conversationId);
+        setConversationId(null);
+        setMessages([]);
+        setIsConnected(false);
+      }
+    };
+
+    // Listen for Auth0's logout event
+    window.addEventListener("auth0:logout", handleLogout);
+
+    return () => {
+      window.removeEventListener("auth0:logout", handleLogout);
+    }
+  }, [conversationId]);
+
+  // Handle message submission. Saves message to database and emits through socket
   const handleSendMessage = async (event: React.FormEvent) => {
+    console.log("Sending message to /api/messages/create");
     event.preventDefault();
     
     if (!messageInput.trim() || !conversationId || !user?.sub) return;
