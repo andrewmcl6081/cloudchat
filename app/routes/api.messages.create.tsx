@@ -1,12 +1,10 @@
 // app/routes/api.messages.create.tsx
-import { json, type ActionFunction } from "@remix-run/node";
-import { MessageService } from "~/services/message.server";
-import { SocketServer } from "~/server/socket.server";
+import { json, type ActionFunction, SerializeFrom } from "@remix-run/node";
+import { MessageService, MessageWithSender } from "~/services/message.server";
+import { socketServer } from "~/server/socket.server";
 
-/**
- * POST /api/messages/create
- * Creates a new message and broadcasts it via Socket.IO
- */
+// POST /api/messages/create
+// Creates a new message and broadcasts it via Socket.IO
 export const action: ActionFunction = async ({ request }) => {
   const formData = await request.formData();
   const content = formData.get("content");
@@ -29,11 +27,20 @@ export const action: ActionFunction = async ({ request }) => {
       senderId: senderId.toString(),
     });
 
-    // Initialize services
-    const socketServer = SocketServer.getInstance();
+    const serializedMessage: SerializeFrom<MessageWithSender> = {
+      ...message,
+      createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
+      sender: {
+        ...message.sender,
+        createdAt: message.sender.createdAt.toISOString(),
+        updatedAt: message.sender.updatedAt.toISOString(),
+        lastActive: message.sender.lastActive.toISOString(),
+      }
+    };
 
-    // Broadcast message via Socket.IO
-    socketServer.emit('new-message', conversationId.toString(), message);
+    // Use emit method instead of direct IO access
+    socketServer.emit("new-message", conversationId.toString(), serializedMessage);
 
     return json({ message });
   } catch (error) {
