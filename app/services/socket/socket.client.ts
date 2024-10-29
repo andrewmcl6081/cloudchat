@@ -2,24 +2,14 @@ import { io, Socket } from "socket.io-client";
 import type { MessageWithSender } from "../message.server";
 import { SerializeFrom } from "@remix-run/node";
 
-// Define events that the client can receive from the sender
+// Define events that the client can receive from the server
 interface ServerToClientEvents {
   "new-message": (message: SerializeFrom<MessageWithSender>) => void;
-  "user-joined": (data: { 
-    userId: string;
-    conversationId: string;
-    activeParticipants: number;
-  }) => void;
+  "user-joined": (data: { userId: string; conversationId: string; }) => void;
   "user-left": (data: { 
     userId: string;
     conversationId: string;
     reason: "left" | "disconnected";
-    activeParticipants: number;
-  }) => void;
-  "participant-update": (data: {
-    conversationId: string;
-    activeParticipants: number;
-    isActive: boolean;
   }) => void;
 }
 
@@ -41,28 +31,17 @@ export class SocketService {
   private static instance: SocketService | null = null;
   private socket: SocketClient | null = null;
   private isConnecting: boolean = false;
-  private reconnectionAttempts: number = 0;
-  private maxReconnectionAttempts: number = 5;
   private debugMode: boolean = true;
+  private activeRooms: Set<string> = new Set();
 
   // Store message handlers for components that want to receive messages
   private messageHandlers: Set<(message: SerializeFrom<MessageWithSender>) => void> = new Set();
-  private userJoinedHandlers: Set<(data: {
-    userId: string;
-    conversationId: string;
-    activeParticipants: number;
-  }) => void> = new Set();
+  private userJoinedHandlers: Set<(data: { userId: string; conversationId: string; }) => void> = new Set();
   private userLeftHandlers: Set<(data: {
     userId: string;
     conversationId: string;
     reason: "left" | "disconnected";
-    activeParticipants: number;
   }) => void> = new Set();
-  private participantUpdateHandlers: Set<(data: {
-    conversationId: string;
-    activeParticipants: number;
-    isActive: boolean;
-  })=> void> = new Set();
 
   private constructor() {
     console.log("Client Socket service initialized");
@@ -105,10 +84,13 @@ export class SocketService {
       this.socket = io(window.location.origin, {
         autoConnect: true,
         reconnection: true,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: this.maxReconnectionAttempts,
-        timeout: 10000
+        timeout: 20000,
+        transports: ["websocket", "polling"],
+        forceNew: false,
+        multiplex: true,
       });
 
       // Set up event handlers for this socket
@@ -126,40 +108,29 @@ export class SocketService {
   private setupEventHandlers() {
     if (!this.socket) return;
 
-    // Log successful connections
+    // Connection event handlers
     this.socket.on("connect", () => {
       this.log("Connected successfully, socket ID:", this.socket?.id);
-      this.reconnectionAttempts = 0;
+      this.rejoinActiveRooms();
     });
 
     // Handle disconnections
     this.socket.on("disconnect", (reason) => {
       this.log("Disconnected:", reason);
-      
-      if (reason === "io server disconnect") {
-        this.connect();
-      }
     });
 
-    // Handle connection errors
-    this.socket.on("connect_error", (error) => {
-      this.log("Connection error:", error);
-      this.reconnectionAttempts++;
+    this.socket.io.on("reconnect", (attempt) => {
+      this.log(`Reconnected after ${attempt} attempts`);
+      this.rejoinActiveRooms();
+    })
 
-      if (this.reconnectionAttempts >= this.maxReconnectionAttempts) {
-        this.log("Max reconnection attempts reached");
-        this.socket?.disconnect();
-      }
-    });
-
-    // Handle incoming messages
     this.socket.on("user-joined", (data) => {
-      this.log("User joined conversation:", data);
+      this.log("User joined:", data);
+      this.userJoinedHandlers.forEach(handler => handler(data));
     });
 
-    // Handle user left notifications
     this.socket.on("user-left", (data) => {
-      this.log("User left conversation:", data);
+      this.log("User left:", data);
       this.userLeftHandlers.forEach(handler => handler(data));
     });
 
@@ -175,24 +146,23 @@ export class SocketService {
     });
   }
 
+  // Connection management
   private ensureConnection(): boolean {
     if (!this.socket?.connected) {
-      this.log("Socket not connected, attempting to reconnect...");
-      this.connect();
-    }
-
-    if (!this.socket?.connected) {
-      this.log("Failed to establish connection");
+      this.log("Socket not connected, waiting for reconnection...");
+      // Let Socket.IO handle reconnection
       return false;
     }
-
+  
     return true;
   }
 
+  // Room management
   public joinConversation(conversationId: string) {
     if (!this.ensureConnection()) return;
 
     this.log("Joining conversation:", conversationId);
+    this.activeRooms.add(conversationId);
     this.socket!.emit("join-conversation", conversationId);
   }
 
@@ -200,18 +170,15 @@ export class SocketService {
     if (!this.ensureConnection()) return;
 
     this.log("Leaving conversation:", conversationId);
+    this.activeRooms.delete(conversationId);
     this.socket!.emit("leave-conversation", conversationId);
   }
 
-  // Send a message to the server
-  public sendMessage(data: { content: string; conversationId: string; senderId: string; }) {
-    if (!this.ensureConnection()) {
-      this.log("Cannot send message - no connection");
-      return;
-    }
-    
-    this.log("Sending message:", data);
-    this.socket!.emit("send-message", data);
+  private rejoinActiveRooms() {
+    this.activeRooms.forEach(roomId => {
+      this.log("Rejoining room after reconnect:", roomId);
+      this.socket?.emit("join-conversation", roomId);
+    })
   }
 
   // Register a handler for new messages
@@ -226,13 +193,31 @@ export class SocketService {
     this.messageHandlers.delete(handler);
   }
 
-  public onUserLeft(handler: (data: { userId: string, conversationId: string}) => void) {
-    this.log("Registering onUserLeft handler");
+  public onUserJoined(handler: (data: { userId: string; conversationId: string; }) => void) {
+    this.log("Registering user joined handler");
+    this.userJoinedHandlers.add(handler);
+  }
+
+  public removeUserJoinedHandler(handler: (data: { userId: string; conversationId: string; }) => void) {
+    this.log("Removing user joined handler");
+    this.userJoinedHandlers.delete(handler);
+  }
+
+  public onUserLeft(handler: (data: {
+    userId: string;
+    conversationId: string;
+    reason: "left" | "disconnected";
+  }) => void) {
+    this.log("Registering user left handler");
     this.userLeftHandlers.add(handler);
   }
 
-  public removeUserLeftHandler(handler: (data: { userId: string, conversationId: string}) => void) {
-    this.log("Removing onUserLeft handler");
+  public removeUserLeftHandler(handler: (data: {
+    userId: string;
+    conversationId: string;
+    reason: "left" | "disconnected";
+  }) => void) {
+    this.log("Removing user left handler");
     this.userLeftHandlers.delete(handler);
   }
 
@@ -243,7 +228,11 @@ export class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+
+    this.activeRooms.clear();
     this.messageHandlers.clear();
+    this.userJoinedHandlers.clear();
+    this.userLeftHandlers.clear();
   }
 
   // Check connection status
@@ -254,6 +243,10 @@ export class SocketService {
   // Get socket ID if connected
   public getSocketId(): string | null {
     return this.socket?.id || null;
+  }
+
+  public getSocket(): SocketClient | null {
+    return this.socket;
   }
 }
 

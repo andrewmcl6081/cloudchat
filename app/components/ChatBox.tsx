@@ -23,24 +23,21 @@ interface ChatBoxProps {
 }
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
-  // Fetchers with proper type definitions
+  // Fetchers
   const userFetcher = useFetcher<UserLoaderData>();
   const messageFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher();
   const { user } = useAuth0();
   
-  // Component state
+  // State management
   const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  
-  // Reference for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Automatically scroll to the bottom of the message list
-  // when new messages arrive
+  // Automatically scroll to the bottom of the message list when new messages arrive
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -52,7 +49,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       socketService.leaveConversation(currentConversationId);
       setMessages([]);
       setConversationId(null);
-      setIsConnected(false);
       setMessageInput("");
     }
   }
@@ -71,14 +67,15 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     const initializeChat = async () => {
       console.group("Chat Intialization Flow");
       try {
-        // First cleanup any existing conversation
-        cleanup(currentConvId);
+        // Only cleanup if we're changing users
+        if (selectedUserId !== userFetcher.data?.user?.id) {
+          cleanup(currentConvId);
+        }
 
         // Connect to WebSocket (initialize new conversation)
         socketService.connect();
-        setIsConnected(true);
 
-        // Load selected user's profile
+        // Load user and conversation data
         userFetcher.load(`/api/users/${selectedUserId}`);
         console.log("Loading user details:", selectedUserId);
 
@@ -105,10 +102,12 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     initializeChat();
 
-    // Cleanup: Leave conversation when unmounting or changing users
+    // Cleanup only when actually changing users
     return () => {
-      cleanup(currentConvId);
-    }
+      if (selectedUserId !== userFetcher.data?.user?.id) {
+        cleanup(currentConvId);
+      }
+    };
   }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
 
   useEffect(() => {
@@ -127,6 +126,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     // Load existing messages
     messagesFetcher.load(`/api/messages/${response.conversationId}`);
+
+    // Logging
     console.log("Requested messages for conversation:", response.conversationId);
     console.groupEnd();
   }, [messageFetcher.data]);
@@ -151,39 +152,77 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   }, [messagesFetcher.data]);
 
   useEffect(() => {
-    if (!isConnected) return;
+    if (!conversationId) return;
 
-    // Handler for real-time messages
     const handleNewMessage = (message: SerializeFrom<MessageWithSender>) => {
-      console.log("Received real-time message:", message);
-
       setMessages(prevMessages => {
-        // Check if message already exists to prevent duplicates
-        const messageExists = prevMessages.some(m => m.id === message.id);
-        if (messageExists) {
+        if (prevMessages.some(m => m.id === message.id)) {
           return prevMessages;
         }
         return [...prevMessages, message];
       });
-
       scrollToBottom();
     };
 
-    // Add handler for when users leave the conversation
-    const handleUserLeft = (data: { userId: string, conversationId: string}) => {
-      console.log("User left chat:", data);
+    const handleUserJoined = (data: { userId: string, conversationId: string }) => {
+      console.log("User joined chat:", data);
+      // Add UI feedback when user joins
     }
 
-    // Register handlers
+    const handleUserLeft = (data: {
+      userId: string,
+      conversationId: string,
+      reason: "left" | "disconnected"
+    }) => {
+      console.log("User left chat:", data);
+      // Add UI feedback when user leaves
+    };
+
+    // Register socket event handlers
     socketService.onNewMessage(handleNewMessage);
+    socketService.onUserJoined(handleUserJoined);
     socketService.onUserLeft(handleUserLeft);
 
-    // Cleanup listener when component unmounts or connection changes
     return () => {
+      // Cleanup event handlers
       socketService.removeMessageHandler(handleNewMessage);
+      socketService.removeUserJoinedHandler(handleUserJoined);
       socketService.removeUserLeftHandler(handleUserLeft);
     };
-  }, [isConnected]);
+  }, [conversationId]);
+
+  useEffect(() => {
+    // Only set up listeners if we have a selected user
+    if (!selectedUserId || !user?.sub) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    // Handle connect event
+    const handleConnect = () => {
+      console.log("Socket connected");
+      setIsConnected(true);
+    }
+
+    // Handle disconnect event
+    const handleDisconnect = () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
+    }
+
+    // Set initial connection state
+    setIsConnected(socket.connected);
+
+    // Add event listeners
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+
+    // Cleanup listeners when component unmounts or selected user changes
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+    };
+  }, [selectedUserId, user?.sub]);
 
   // Handle user logout
   useEffect(() => {
@@ -193,7 +232,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         socketService.leaveConversation(conversationId);
         setConversationId(null);
         setMessages([]);
-        setIsConnected(false);
       }
     };
 

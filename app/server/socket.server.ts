@@ -6,16 +6,11 @@ import { SerializeFrom } from "@remix-run/node";
 // Define the events the server can send to clients
 export interface ServerToClientEvents {
   "new-message": (message: SerializeFrom<MessageWithSender>) => void;
-  "user-joined": (data: { userId: string, conversationId: string }) => void;
-  "user-left":   (data: {
-    userId: string,
-    conversationId: string,
-    reason: "left" | "disconnected"
-  }) => void;
-  "participant-update": (data: {
+  "user-joined": (data: { userId: string; conversationId: string; }) => void;
+  "user-left": (data: {
+    userId: string;
     conversationId: string;
-    activeParticipants: number;
-    isActive: boolean;
+    reason: "left" | "disconnected";
   }) => void;
 }
 
@@ -42,7 +37,7 @@ export class SocketServer {
   private debugMode: boolean = true;
   private initialized: boolean = false;
   private socketRooms: Map<string, Set<string>> = new Map(); // socketId -> Set of roomIds
-  private conversationParticipants: Map<string, Set<string>> = new Map(); // conversationId -> Set of socketIds
+  private connectionStatusHandlers: Set<(connected: boolean) => void> = new Set();
 
   private constructor() {
     this.log('SocketServer constructor called');
@@ -61,12 +56,6 @@ export class SocketServer {
       this.socketRooms.set(socketId, new Set());
     }
     this.socketRooms.get(socketId)?.add(roomId);
-
-    // Track room's participants
-    if (!this.conversationParticipants.has(roomId)) {
-      this.conversationParticipants.set(roomId, new Set());
-    }
-    this.conversationParticipants.get(roomId)?.add(socketId);
   }
 
   private removeSocketFromRoom(socketId: string, roomId: string) {
@@ -78,24 +67,6 @@ export class SocketServer {
         this.socketRooms.delete(socketId);
       }
     }
-
-    // Remove from room's participants
-    const participants = this.conversationParticipants.get(roomId);
-    if (participants) {
-      participants.delete(socketId);
-      if (participants.size === 0) {
-        this.conversationParticipants.delete(roomId);
-      }
-    }
-  }
-
-  private emitParticipantUpdate(room: string) {
-    const participantCount = this.conversationParticipants.get(room)?.size || 0;
-    global.__socketIO?.to(room).emit("participant-update", {
-      conversationId: room,
-      activeParticipants: participantCount,
-      isActive: participantCount === 2 // Chat is fully active when both users are present
-    });
   }
 
   private getSocketRooms(socketId: string): string[] {
@@ -130,7 +101,11 @@ export class SocketServer {
             : "http://localhost:5173",
           methods: ["GET", "POST"],
           credentials: true
-        }
+        },
+        pingInterval: 25000, // How often to ping clients
+        pingTimeout: 20000, // How long to wait for pong
+        connectTimeout: 20000, // Connection timeout
+        transports: ["websocket", "polling"]
       });
 
       this.setupEventHandlers();
@@ -174,14 +149,14 @@ export class SocketServer {
       // Handle client joining a conversation
       socket.on("join-conversation", (conversationId: string) => {
         try {
+
+          // Join the room
           socket.join(conversationId);
           this.addSocketToRoom(socket.id, conversationId);
 
-          const participantCount = this.conversationParticipants.get(conversationId)?.size || 0;
-
+          // Log connection with room details
           this.log(`Socket ${socket.id} joined conversation ${conversationId}`, {
-            participantCount,
-            participants: Array.from(this.conversationParticipants.get(conversationId) || []),
+            socketIoRoomSize: this.getSocketRoomSize(conversationId),
             socketRooms: this.getSocketRooms(socket.id)
           });
 
@@ -189,11 +164,7 @@ export class SocketServer {
           socket.to(conversationId).emit("user-joined", {
             conversationId,
             userId: socket.id,
-            activeParticipants: participantCount,
           });
-
-          // Emit updated participant count to all users in the conversation
-          this.emitParticipantUpdate(conversationId);
         } catch (error) {
           this.log("Error in join-conversation:", error);
         }
@@ -202,7 +173,9 @@ export class SocketServer {
       // Handle client leaving a conversation
       socket.on("leave-conversation", (conversationId: string) => {
         try {
-          this.log(`Socket ${socket.id} leaving conversation ${conversationId}`);
+          this.log(`Socket ${socket.id} leaving conversation ${conversationId}`, {
+            currentRooms: this.getSocketRooms(socket.id)
+          });
 
           // Emit to the other clients that we are leaving conversation
           socket.to(conversationId).emit("user-left", {
@@ -214,10 +187,6 @@ export class SocketServer {
           // Leave conversation
           socket.leave(conversationId);
           this.removeSocketFromRoom(socket.id, conversationId);
-
-          // Emit updated participant count
-          this.emitParticipantUpdate(conversationId);
-
           this.log(`Socket ${socket.id} left conversation ${conversationId}`);
         } catch (error) {
           this.log("Error in leave-conversation:", error);
@@ -236,9 +205,7 @@ export class SocketServer {
             userId: socket.id,
             reason: "disconnected"
           });
-
           this.removeSocketFromRoom(socket.id, roomId);
-          this.emitParticipantUpdate(roomId);
         });
       });
 
@@ -247,7 +214,6 @@ export class SocketServer {
         const rooms = this.getSocketRooms(socket.id);
         rooms.forEach(roomId => {
           this.removeSocketFromRoom(socket.id, roomId);
-          this.emitParticipantUpdate(roomId);
         });
         this.log("Client Disconnected:", socket.id);
       });
@@ -255,9 +221,7 @@ export class SocketServer {
       socket.on("send-message", (data) => {
         try {
           // Verify sender is in the conversation
-          const isParticipant = this.conversationParticipants.get(data.conversationId)?.has(socket.id);
-
-          if (!isParticipant) {
+          if (!this.getSocketRooms(socket.id).includes(data.conversationId)) {
             this.log(`Message not broadcast - socket not in room ${data.conversationId}`);
             return;
           }
@@ -267,7 +231,7 @@ export class SocketServer {
 
           this.log(`Message sent in conversation ${data.conversationId}`, {
             socketId: socket.id,
-            participants: Array.from(this.conversationParticipants.get(data.conversationId) || [])
+            roomSize: this.getSocketRoomSize(data.conversationId)
           });
         } catch (error) {
           this.log("Error handling send-message:", error);
@@ -297,7 +261,6 @@ export class SocketServer {
     if (!global.__socketIO) {
       throw new Error("Socket.IO not initialized");
     }
-
     return global.__socketIO;
   }
 }
