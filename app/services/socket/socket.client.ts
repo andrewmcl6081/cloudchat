@@ -5,8 +5,22 @@ import { SerializeFrom } from "@remix-run/node";
 // Define events that the client can receive from the sender
 interface ServerToClientEvents {
   "new-message": (message: SerializeFrom<MessageWithSender>) => void;
-  "user-joined": (data: { userId: string, conversationId: string }) => void;
-  "user-left":   (data: { userId: string, conversationId: string }) => void;
+  "user-joined": (data: { 
+    userId: string;
+    conversationId: string;
+    activeParticipants: number;
+  }) => void;
+  "user-left": (data: { 
+    userId: string;
+    conversationId: string;
+    reason: "left" | "disconnected";
+    activeParticipants: number;
+  }) => void;
+  "participant-update": (data: {
+    conversationId: string;
+    activeParticipants: number;
+    isActive: boolean;
+  }) => void;
 }
 
 // Define events that the client can send to the server
@@ -33,7 +47,22 @@ export class SocketService {
 
   // Store message handlers for components that want to receive messages
   private messageHandlers: Set<(message: SerializeFrom<MessageWithSender>) => void> = new Set();
-  private userLeftHandlers: Set<(data: { userId: string, conversationId: string}) => void> = new Set();
+  private userJoinedHandlers: Set<(data: {
+    userId: string;
+    conversationId: string;
+    activeParticipants: number;
+  }) => void> = new Set();
+  private userLeftHandlers: Set<(data: {
+    userId: string;
+    conversationId: string;
+    reason: "left" | "disconnected";
+    activeParticipants: number;
+  }) => void> = new Set();
+  private participantUpdateHandlers: Set<(data: {
+    conversationId: string;
+    activeParticipants: number;
+    isActive: boolean;
+  })=> void> = new Set();
 
   private constructor() {
     console.log("Client Socket service initialized");
