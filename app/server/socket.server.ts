@@ -62,15 +62,24 @@ export class SocketServer {
     // Remove from socket's rooms
     const rooms = this.socketRooms.get(socketId);
     if (rooms) {
+      this.log(`Before removal - Socket ${socketId} rooms:`, Array.from(rooms));
       rooms.delete(roomId);
+      this.log(`After removal - Socket ${socketId} rooms:`, Array.from(rooms));
       if (rooms.size === 0) {
         this.socketRooms.delete(socketId);
+        this.log(`Removed empty room set for socket ${socketId}`);
       }
     }
   }
 
   private getSocketRooms(socketId: string): string[] {
-    return Array.from(this.socketRooms.get(socketId) || []);
+    const rooms = this.socketRooms.get(socketId);
+    const socketIORooms = global.__socketIO?.sockets.sockets.get(socketId)?.rooms;
+    this.log(`Room state for ${socketId}:`, {
+      tracked: Array.from(rooms || []),
+      socketIO: Array.from(socketIORooms || [])
+    });
+    return Array.from(rooms || []);
   }
 
   private getSocketRoomSize(roomId: string): number {
@@ -149,16 +158,28 @@ export class SocketServer {
       // Handle client joining a conversation
       socket.on("join-conversation", (conversationId: string) => {
         try {
+          // Check if already in this room
+          if (socket.rooms.has(conversationId)) {
+            this.log(`Socket ${socket.id} is already in room ${conversationId}, skipping join`);
+            return;
+          }
+
+          // Leave all current rooms before joining new one
+          const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
+          currentRooms.forEach(roomId => {
+            socket.leave(roomId);
+            this.removeSocketFromRoom(socket.id, roomId);
+          });
+          
+          // Log rooms before joining
+          this.log(`Current rooms for socket ${socket.id} before joining:`, Array.from(this.socketRooms.get(socket.id) || []));
 
           // Join the room
           socket.join(conversationId);
           this.addSocketToRoom(socket.id, conversationId);
 
-          // Log connection with room details
-          this.log(`Socket ${socket.id} joined conversation ${conversationId}`, {
-            socketIoRoomSize: this.getSocketRoomSize(conversationId),
-            socketRooms: this.getSocketRooms(socket.id)
-          });
+          // Log rooms after joining
+          this.log(`Current rooms for socket ${socket.id} after joining:`, Array.from(this.socketRooms.get(socket.id) || []));
 
           // Notify participants about the new joiner
           socket.to(conversationId).emit("user-joined", {
@@ -173,9 +194,20 @@ export class SocketServer {
       // Handle client leaving a conversation
       socket.on("leave-conversation", (conversationId: string) => {
         try {
-          this.log(`Socket ${socket.id} leaving conversation ${conversationId}`, {
-            currentRooms: this.getSocketRooms(socket.id)
-          });
+          const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
+
+          // Only proceed if socket is actually in this room
+          if (!currentRooms.includes(conversationId)) {
+            this.log(`Socket ${socket.id} attempted to leave room ${conversationId} but wasn't in it`);
+            return;
+          }
+        
+          // Debug logs
+          console.log("\nLeave Conversation Debug:");
+          console.log("Socket ID:", socket.id);
+          console.log("Attempting to leave:", conversationId);
+          console.log("Server tracked rooms:", currentRooms);
+          console.log("Socket.IO rooms:", Array.from(socket.rooms));
 
           // Emit to the other clients that we are leaving conversation
           socket.to(conversationId).emit("user-left", {
@@ -187,7 +219,11 @@ export class SocketServer {
           // Leave conversation
           socket.leave(conversationId);
           this.removeSocketFromRoom(socket.id, conversationId);
-          this.log(`Socket ${socket.id} left conversation ${conversationId}`);
+          
+          // Logging
+          console.log("Rooms after leaving:", Array.from(this.socketRooms.get(socket.id) || []));
+          console.log("Socket.IO rooms after leaving:", Array.from(socket.rooms));
+          console.log("Leave Conversation Debug End\n");
         } catch (error) {
           this.log("Error in leave-conversation:", error);
         }

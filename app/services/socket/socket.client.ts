@@ -33,6 +33,8 @@ export class SocketService {
   private isConnecting: boolean = false;
   private debugMode: boolean = true;
   private activeRooms: Set<string> = new Set();
+  private hasInitialized: boolean = false;
+  private isReconnecting: boolean = false;
 
   // Store message handlers for components that want to receive messages
   private messageHandlers: Set<(message: SerializeFrom<MessageWithSender>) => void> = new Set();
@@ -64,6 +66,11 @@ export class SocketService {
 
   // Initialize and connect to the socket server
   public connect(): SocketClient | null {
+    if (this.hasInitialized && this.socket?.connected) {
+      this.log("Already initialized and connected, socket ID:", this.socket.id);
+      return this.socket;
+    }
+
     // Prevent multiple simultaneous connection attempts
     if (this.isConnecting) {
       this.log("Connection already in progress");
@@ -80,6 +87,14 @@ export class SocketService {
       this.isConnecting = true;
       this.log("Initiating connection...");
 
+      // Cleanup any existing socket
+      if (this.socket) {
+        this.log("Cleaning up existing socket");
+        this.socket.removeAllListeners();
+        this.socket.disconnect();
+        this.socket = null;
+      }
+
       // Create new socket connection
       this.socket = io(window.location.origin, {
         autoConnect: true,
@@ -95,6 +110,7 @@ export class SocketService {
 
       // Set up event handlers for this socket
       this.setupEventHandlers();
+      this.hasInitialized = true;
       return this.socket;
     } catch (error) {
       console.error("Socket connection error:", error);
@@ -111,17 +127,22 @@ export class SocketService {
     // Connection event handlers
     this.socket.on("connect", () => {
       this.log("Connected successfully, socket ID:", this.socket?.id);
-      this.rejoinActiveRooms();
+      this.log(`Active rooms at connect: ${Array.from(this.activeRooms)}`);
     });
 
     // Handle disconnections
     this.socket.on("disconnect", (reason) => {
       this.log("Disconnected:", reason);
+      this.isReconnecting = true;
     });
 
     this.socket.io.on("reconnect", (attempt) => {
       this.log(`Reconnected after ${attempt} attempts`);
-      this.rejoinActiveRooms();
+      if (this.isReconnecting) {
+        this.log("WE ARE RECONNECTING BITCH");
+        this.rejoinActiveRooms();
+        this.isReconnecting = false;
+      }
     })
 
     this.socket.on("user-joined", (data) => {
@@ -161,6 +182,23 @@ export class SocketService {
   public joinConversation(conversationId: string) {
     if (!this.ensureConnection()) return;
 
+    this.log(`Join attempt for conversation: ${conversationId}`);
+    this.log(`Current active rooms: ${Array.from(this.activeRooms)}`);
+
+    // Check if already in this room
+    if (this.activeRooms.has(conversationId) && !this.isReconnecting) {
+      this.log(`Already in conversation ${conversationId}, skipping join`);
+      return;
+    }
+
+    // Leave any existing rooms first
+    this.activeRooms.forEach(roomId => {
+      if (roomId !== conversationId) {
+        this.log(`Leaving room ${roomId} before joining ${conversationId}`);
+        this.leaveConversation(roomId);
+      }
+    });
+
     this.log("Joining conversation:", conversationId);
     this.activeRooms.add(conversationId);
     this.socket!.emit("join-conversation", conversationId);
@@ -168,6 +206,11 @@ export class SocketService {
 
   public leaveConversation(conversationId: string) {
     if (!this.ensureConnection()) return;
+
+    if (!this.activeRooms.has(conversationId)) {
+      this.log(`Not in conversation ${conversationId}, skipping leave`);
+      return;
+    }
 
     this.log("Leaving conversation:", conversationId);
     this.activeRooms.delete(conversationId);
@@ -225,14 +268,12 @@ export class SocketService {
   public disconnect() {
     if (this.socket) {
       this.log("Disconnecting socket");
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.socket = null;
+      this.hasInitialized = false;
+      this.activeRooms.clear();
     }
-
-    this.activeRooms.clear();
-    this.messageHandlers.clear();
-    this.userJoinedHandlers.clear();
-    this.userLeftHandlers.clear();
   }
 
   // Check connection status

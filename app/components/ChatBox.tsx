@@ -67,8 +67,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     const initializeChat = async () => {
       console.group("Chat Intialization Flow");
       try {
-        // Only cleanup if we're changing users
-        if (selectedUserId !== userFetcher.data?.user?.id) {
+        // Always cleanup previous conversation before starting a new one
+        if (currentConvId) {
           cleanup(currentConvId);
         }
 
@@ -101,13 +101,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     }
 
     initializeChat();
-
-    // Cleanup only when actually changing users
-    return () => {
-      if (selectedUserId !== userFetcher.data?.user?.id) {
-        cleanup(currentConvId);
-      }
-    };
   }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
 
   useEffect(() => {
@@ -121,6 +114,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     // Store conversation ID in state
     setConversationId(response.conversationId);
 
+    console.log("JOINING NOWWWWWWWWWWWWWWWWWW");
     // Join the WebSocket room for this conversation
     socketService.joinConversation(response.conversationId);
 
@@ -155,6 +149,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     if (!conversationId) return;
 
     const handleNewMessage = (message: SerializeFrom<MessageWithSender>) => {
+      console.log("New Message received");
       setMessages(prevMessages => {
         if (prevMessages.some(m => m.id === message.id)) {
           return prevMessages;
