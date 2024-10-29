@@ -37,7 +37,6 @@ export class SocketServer {
   private debugMode: boolean = true;
   private initialized: boolean = false;
   private socketRooms: Map<string, Set<string>> = new Map(); // socketId -> Set of roomIds
-  private connectionStatusHandlers: Set<(connected: boolean) => void> = new Set();
 
   private constructor() {
     this.log('SocketServer constructor called');
@@ -156,36 +155,43 @@ export class SocketServer {
       this.log("Client connected!", socket.id);
 
       // Handle client joining a conversation
-      socket.on("join-conversation", (conversationId: string) => {
+      socket.on("join-conversation", async (conversationId: string) => {
         try {
-          // Check if already in this room
-          if (socket.rooms.has(conversationId)) {
-            this.log(`Socket ${socket.id} is already in room ${conversationId}, skipping join`);
+          // First check if already in room from reconnection
+          const room = await global.__socketIO?.in(conversationId).allSockets();
+          const isInRoom = room?.has(socket.id) || false;
+
+          if (isInRoom) {
+            this.log(`Socket ${socket.id} reconnected to room ${conversationId}`);
+            this.addSocketToRoom(socket.id, conversationId); // Update our tracking
             return;
           }
 
-          // Leave all current rooms before joining new one
+          // Get current rooms and leave them before joining new one
           const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
-          currentRooms.forEach(roomId => {
+          for (const roomId of currentRooms) {
             socket.leave(roomId);
             this.removeSocketFromRoom(socket.id, roomId);
-          });
-          
-          // Log rooms before joining
+          }
+
           this.log(`Current rooms for socket ${socket.id} before joining:`, Array.from(this.socketRooms.get(socket.id) || []));
 
           // Join the room
-          socket.join(conversationId);
+          await socket.join(conversationId);
           this.addSocketToRoom(socket.id, conversationId);
 
           // Log rooms after joining
           this.log(`Current rooms for socket ${socket.id} after joining:`, Array.from(this.socketRooms.get(socket.id) || []));
 
-          // Notify participants about the new joiner
+          // Only emit user-joined for new joins (not reconnects)
           socket.to(conversationId).emit("user-joined", {
             conversationId,
             userId: socket.id,
           });
+
+          // Log final room state
+          const updatedRoom = await global.__socketIO?.in(conversationId).allSockets();
+          this.log(`Room ${conversationId} members:`, Array.from(updatedRoom || []));
         } catch (error) {
           this.log("Error in join-conversation:", error);
         }
