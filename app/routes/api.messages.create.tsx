@@ -1,7 +1,9 @@
-// app/routes/api.messages.create.tsx
 import { json, type ActionFunction, SerializeFrom } from "@remix-run/node";
 import { MessageService, MessageWithSender } from "~/services/message.server";
-import { socketServer } from "~/server/socket.server";
+
+export interface SendMessageResponse {
+  serializedMessage: SerializeFrom<MessageWithSender>;
+}
 
 // POST /api/messages/create
 // Creates a new message and broadcasts it via Socket.IO
@@ -39,10 +41,7 @@ export const action: ActionFunction = async ({ request }) => {
       }
     };
 
-    // Use emit method instead of direct IO access
-    socketServer.emit("new-message", conversationId.toString(), serializedMessage);
-
-    return json({ message });
+    return json({ serializedMessage });
   } catch (error) {
     console.error("Failed to create message:", error);
     throw json(

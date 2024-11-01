@@ -1,6 +1,6 @@
 // app/components/ChatBox.tsx
 import React, { useEffect, useState, useRef } from 'react';
-import { ReceiptRussianRuble, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useFetcher } from '@remix-run/react';
 import { useAuth0 } from "@auth0/auth0-react";
 import { SerializeFrom } from "@remix-run/node";
@@ -8,6 +8,7 @@ import LoadingSpinner from '~/components/LoadingSpinner';
 import { UserLoaderData } from '~/routes/api.users.$userId';
 import { socketService } from '~/services/socket/socket.client';
 import type { MessageWithSender } from '~/services/message.server';
+import type { SendMessageResponse } from '~/routes/api.messages.create';
 
 // Define response types for our API routes
 interface ConversationResponse {
@@ -27,7 +28,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const userFetcher = useFetcher<UserLoaderData>();
   const messageFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
-  const sendMessageFetcher = useFetcher();
+  const sendMessageFetcher = useFetcher<SendMessageResponse>();
   const { user } = useAuth0();
   
   // State management
@@ -114,7 +115,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     // Store conversation ID in state
     setConversationId(response.conversationId);
 
-    console.log("JOINING NOWWWWWWWWWWWWWWWWWW");
     // Join the WebSocket room for this conversation
     socketService.joinConversation(response.conversationId);
 
@@ -237,6 +237,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       window.removeEventListener("auth0:logout", handleLogout);
     }
   }, [conversationId]);
+
+  useEffect(() => {
+    // Access serializedMessage only if it exists in sendMessageFetcher.data
+    if (sendMessageFetcher.data && sendMessageFetcher.data.serializedMessage) {
+      const { serializedMessage } = sendMessageFetcher.data;
+  
+      // Add the new message to the messages list
+      setMessages((prevMessages) => [...prevMessages, serializedMessage]);
+  
+      // Emit the message via Socket.IO to notify other clients
+      socketService.getSocket()?.emit("send-message", {
+        content: serializedMessage.content,
+        conversationId: serializedMessage.conversationId,
+        senderId: serializedMessage.senderId,
+      });
+    }
+  }, [sendMessageFetcher.data]);
 
   // Handle message submission. Saves message to database and emits through socket
   const handleSendMessage = async (event: React.FormEvent) => {
