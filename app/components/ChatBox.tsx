@@ -38,9 +38,10 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Automatically scroll to the bottom of the message list when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (smooth = true) => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    }, 0);
   };
 
   // Handle cleanup when user changes or logs out
@@ -127,19 +128,14 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   }, [messageFetcher.data]);
 
   useEffect(() => {
-    console.group("Message Loading Flow");
-    console.log("MessagesFetcher State:", messagesFetcher.state);
-    console.log("MessagesFetcher Data:", messagesFetcher.data);
-
     if (messagesFetcher.state === "loading") {
       console.log("Loading Messages...");
       return;
     }
 
     if (messagesFetcher.data?.messages) {
-      console.log("Updating messages:", messagesFetcher.data.messages);
       setMessages(messagesFetcher.data.messages);
-      scrollToBottom();
+      scrollToBottom(false);
     }
 
     console.groupEnd();
@@ -156,7 +152,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         }
         return [...prevMessages, message];
       });
-      scrollToBottom();
+      console.log("NEW MESSAGE USE EFFECT");
+      scrollToBottom(true);
     };
 
     const handleUserJoined = (data: { userId: string, conversationId: string }) => {
