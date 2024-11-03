@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
 import UserList from "~/components/UserList";
-import ChatBox from "~/components/ChatBox";
+import ChatBox from "~/components/chat/ChatBox";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0

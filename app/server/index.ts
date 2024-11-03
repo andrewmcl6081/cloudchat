@@ -3,7 +3,7 @@ import { createRequestHandler } from "@remix-run/express";
 import compression from "compression";
 import express from "express";
 import morgan from "morgan";
-import { socketServer } from "./socket.server";
+import { socketServer } from "../services/socket/socket.server";
 import { ServerBuild } from "@remix-run/node";
 import path from "path";
 

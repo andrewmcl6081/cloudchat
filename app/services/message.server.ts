@@ -1,9 +1,6 @@
 import { db } from "~/services/db/index.server";
-import type { Message, User } from "@prisma/client";
+import { MessageWithSender } from "~/types";
 
-export interface MessageWithSender extends Message {
-  sender: User;
-}
 
 export class MessageService {
   /**

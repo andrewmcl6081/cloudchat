@@ -1,5 +1,4 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { useNavigate } from "@remix-run/react";
 import { useEffect } from "react";
 import LoadingSpinner from "~/components/LoadingSpinner";
 

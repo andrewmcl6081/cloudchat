@@ -1,9 +1,6 @@
-import { json, type ActionFunction, SerializeFrom } from "@remix-run/node";
-import { MessageService, MessageWithSender } from "~/services/message.server";
-
-export interface SendMessageResponse {
-  serializedMessage: SerializeFrom<MessageWithSender>;
-}
+import { json, type ActionFunction } from "@remix-run/node";
+import { MessageService } from "~/services/message.server";
+import type { CreateMessagePayload, MessageError, SendMessageResponse } from "~/types";
 
 // POST /api/messages/create
 // Creates a new message and broadcasts it via Socket.IO
@@ -15,7 +12,7 @@ export const action: ActionFunction = async ({ request }) => {
 
   // Validate required fields
   if (!content || !conversationId || !senderId) {
-    throw json(
+    throw json<MessageError>(
       { error: "Content, conversation ID, and sender ID are required" },
       { status: 400 }
     );
@@ -27,9 +24,9 @@ export const action: ActionFunction = async ({ request }) => {
       content: content.toString(),
       conversationId: conversationId.toString(),
       senderId: senderId.toString(),
-    });
+    } as CreateMessagePayload);
 
-    const serializedMessage: SerializeFrom<MessageWithSender> = {
+    const serializedMessage = {
       ...message,
       createdAt: message.createdAt.toISOString(),
       updatedAt: message.updatedAt.toISOString(),
@@ -41,7 +38,7 @@ export const action: ActionFunction = async ({ request }) => {
       }
     };
 
-    return json({ serializedMessage });
+    return json<SendMessageResponse>({ serializedMessage });
   } catch (error) {
     console.error("Failed to create message:", error);
     throw json(

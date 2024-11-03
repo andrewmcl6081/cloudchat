@@ -1,32 +1,26 @@
 // app/components/ChatBox.tsx
 import React, { useEffect, useState, useRef } from 'react';
-import { User } from 'lucide-react';
 import { useFetcher } from '@remix-run/react';
 import { useAuth0 } from "@auth0/auth0-react";
 import { SerializeFrom } from "@remix-run/node";
 import LoadingSpinner from '~/components/LoadingSpinner';
 import { UserLoaderData } from '~/routes/api.users.$userId';
 import { socketService } from '~/services/socket/socket.client';
-import type { MessageWithSender } from '~/services/message.server';
-import type { SendMessageResponse } from '~/routes/api.messages.create';
-
-// Define response types for our API routes
-interface ConversationResponse {
-  conversationId: string;
-}
-
-interface MessagesResponse {
-  messages: MessageWithSender[];
-}
-
-interface ChatBoxProps {
-  selectedUserId: string | null;
-}
+import { ChatHeader } from './ChatHeader';
+import { MessageList } from './MessageList';
+import type { 
+  MessageWithSender, 
+  SendMessageResponse, 
+  ConversationResponse, 
+  MessagesResponse, 
+  ChatBoxProps 
+} from '~/types';
+import { MessageInput } from './MessageInput';
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
   const userFetcher = useFetcher<UserLoaderData>();
-  const messageFetcher = useFetcher<ConversationResponse>();
+  const conversationFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher<SendMessageResponse>();
   const { user } = useAuth0();
@@ -83,7 +77,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
         // Create or get conversation between users
         if (selectedUserId && user?.sub) {
-          messageFetcher.submit(
+          conversationFetcher.submit(
             {
               userId1: user.sub,
               userId2: selectedUserId
@@ -107,7 +101,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   useEffect(() => {
     //Check if we have conversation data from the API
-    const response = messageFetcher.data;
+    const response = conversationFetcher.data;
     if (!response?.conversationId) return;
 
     console.group("Conversation Setup Flow");
@@ -125,7 +119,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     // Logging
     console.log("Requested messages for conversation:", response.conversationId);
     console.groupEnd();
-  }, [messageFetcher.data]);
+  }, [conversationFetcher.data]);
 
   useEffect(() => {
     if (messagesFetcher.state === "loading") {
@@ -152,7 +146,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         }
         return [...prevMessages, message];
       });
-      console.log("NEW MESSAGE USE EFFECT");
       scrollToBottom(true);
     };
 
@@ -306,68 +299,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      {/* Chat Header - Shows selected user info */}
-      <div className="flex items-center px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-            <User className="h-6 w-6 text-gray-500" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">
-              {selectedUser.displayName || 'User'}
-            </h2>
-            <p className="text-sm text-gray-500">{selectedUser.email}</p>
-          </div>
-        </div>
-      </div>
+      <ChatHeader
+        user={selectedUser}
+        isConnected={isConnected}
+      />
 
-      {/* Messages Area - Displays conversation history */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.senderId === user?.sub ? 'justify-end' : 'justify-start'
-            }`}
-          >
-            <div
-              className={`rounded-lg px-4 py-2 max-w-[70%] ${
-                message.senderId === user?.sub
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-900'
-              }`}
-            >
-              <p className="text-sm">{message.content}</p>
-              <span className={`text-xs ${
-                message.senderId === user?.sub ? 'text-blue-100' : 'text-gray-500'
-              }`}>
-                {new Date(message.createdAt).toLocaleTimeString()}
-              </span>
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+      <MessageList
+        messages={messages}
+        currentUserId={user?.sub}
+        messagesEndRef={messagesEndRef}
+      />
 
-      {/* Message Input Form */}
-      <form onSubmit={handleSendMessage} className="px-6 py-4 border-t border-gray-200">
-        <div className="flex space-x-4">
-          <input
-            type="text"
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={!messageInput.trim() || !conversationId}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Send
-          </button>
-        </div>
-      </form>
+      <MessageInput
+        value={messageInput}
+        onChange={setMessageInput}
+        onSubmit={handleSendMessage}
+        disabled={!isConnected || !conversationId}
+      />
     </div>
   );
 }

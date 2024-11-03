@@ -1,29 +1,7 @@
-import type { Server as HTTPServer } from "http";
 import { Server } from "socket.io";
-import type { MessageWithSender } from "~/services/message.server";
 import { SerializeFrom } from "@remix-run/node";
-
-// Define the events the server can send to clients
-export interface ServerToClientEvents {
-  "new-message": (message: SerializeFrom<MessageWithSender>) => void;
-  "user-joined": (data: { userId: string; conversationId: string; }) => void;
-  "user-left": (data: {
-    userId: string;
-    conversationId: string;
-    reason: "left" | "disconnected";
-  }) => void;
-}
-
-// Define the events the server can receive from clients
- export interface ClientToServerEvents {
-  "join-conversation":  (conversationId: string) => void;
-  "leave-conversation": (conversationId: string) => void;
-  "send-message":       (data: {
-    content: string;
-    conversationId: string;
-    senderId: string;
-  }) => void;
-}
+import type { Server as HTTPServer } from "http";
+import type { ServerToClientEvents, ClientToServerEvents, MessageWithSender } from "~/types";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -33,7 +11,6 @@ declare global {
 }
 
 export class SocketServer {
-  private static instance: SocketServer | null = null;
   private debugMode: boolean = true;
   private initialized: boolean = false;
   private socketRooms: Map<string, Set<string>> = new Map(); // socketId -> Set of roomIds
