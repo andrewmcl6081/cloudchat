@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
-import type { MessageWithSender } from "../message.server";
-import { SerializeFrom } from "@remix-run/node";
+import type { MessageWithSender } from "~/types";
+import type { SerializeFrom } from "@remix-run/node";
 
 // Define events that the client can receive from the server
 interface ServerToClientEvents {
@@ -46,7 +46,6 @@ export class SocketService {
   }) => void> = new Set();
 
   private constructor() {
-    console.log("Client Socket service initialized");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,6 +67,11 @@ export class SocketService {
   public connect(): SocketClient | null {
     if (this.hasInitialized && this.socket?.connected) {
       this.log("Already initialized and connected, socket ID:", this.socket.id);
+      return this.socket;
+    }
+
+    if (this.socket && this.socket.connected) {
+      this.log("Socket already connected, skipping new connection attempt");
       return this.socket;
     }
 
@@ -167,6 +171,16 @@ export class SocketService {
     });
   }
 
+  public sendMessage(data: { content: string; conversationId: string; senderId: string }) {
+    if (!this.ensureConnection()) {
+      this.log("Cannot send message: socket is not connected");
+      return;
+    }
+
+    this.log("Sending message:", data);
+    this.socket!.emit("send-message", data);
+  }
+
   // Connection management
   private ensureConnection(): boolean {
     if (!this.socket?.connected) {
@@ -225,28 +239,28 @@ export class SocketService {
   }
 
   // Register a handler for new messages
-  public onNewMessage(handler: (message: SerializeFrom<MessageWithSender>) => void) {
+  public addNewMessageListener(handler: (message: SerializeFrom<MessageWithSender>) => void) {
     this.log("Registering new message handler");
     this.messageHandlers.add(handler);
   }
 
   // Remove a message handler
-  public removeMessageHandler(handler: (message: SerializeFrom<MessageWithSender>) => void) {
+  public removeNewMessageListener(handler: (message: SerializeFrom<MessageWithSender>) => void) {
     this.log("Removing message handler");
     this.messageHandlers.delete(handler);
   }
 
-  public onUserJoined(handler: (data: { userId: string; conversationId: string; }) => void) {
+  public addUserJoinedListener(handler: (data: { userId: string; conversationId: string; }) => void) {
     this.log("Registering user joined handler");
     this.userJoinedHandlers.add(handler);
   }
 
-  public removeUserJoinedHandler(handler: (data: { userId: string; conversationId: string; }) => void) {
+  public removeUserJoinedListener(handler: (data: { userId: string; conversationId: string; }) => void) {
     this.log("Removing user joined handler");
     this.userJoinedHandlers.delete(handler);
   }
 
-  public onUserLeft(handler: (data: {
+  public addUserLeftListener(handler: (data: {
     userId: string;
     conversationId: string;
     reason: "left" | "disconnected";
@@ -255,7 +269,7 @@ export class SocketService {
     this.userLeftHandlers.add(handler);
   }
 
-  public removeUserLeftHandler(handler: (data: {
+  public removeUserLeftListener(handler: (data: {
     userId: string;
     conversationId: string;
     reason: "left" | "disconnected";

@@ -2,12 +2,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useFetcher } from '@remix-run/react';
 import { useAuth0 } from "@auth0/auth0-react";
-import { SerializeFrom } from "@remix-run/node";
+import type { SerializeFrom } from "@remix-run/node";
 import LoadingSpinner from '~/components/LoadingSpinner';
 import { UserLoaderData } from '~/routes/api.users.$userId';
-import { socketService } from '~/services/socket/socket.client';
 import { ChatHeader } from './ChatHeader';
 import { MessageList } from './MessageList';
+import { useSocketContext } from '~/hooks/useSocketContext';
+import { useSocketEvent } from '~/hooks/useSocketEvent';
 import type { 
   MessageWithSender, 
   SendMessageResponse, 
@@ -28,9 +29,11 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // State management
   const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Socket Context
+  const { isConnected, joinConversation, leaveConversation, sendMessage, getSocketId } = useSocketContext(); 
 
   const scrollToBottom = (smooth = true) => {
     setTimeout(() => {
@@ -42,61 +45,68 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const cleanup = (currentConversationId: string | null) => {
     if (currentConversationId) {
       console.log("Cleaning up conversation:", currentConversationId);
-      socketService.leaveConversation(currentConversationId);
+      leaveConversation(currentConversationId);
       setMessages([]);
       setConversationId(null);
       setMessageInput("");
     }
   }
 
+  // Socket event handlers
+  useSocketEvent({
+    onNewMessage: (message) => {
+      console.log("New Message Received:", message);
+      setMessages(prevMessages => {
+        if (prevMessages.some(m => m.id === message.id)) {
+          return prevMessages;
+        }
+        return [...prevMessages, message];
+      });
+      scrollToBottom(true);
+    },
+    onUserJoined: (data) => {
+      console.log("User joined chat:", data);
+      // Add UI feedback when user joins
+    },
+    onUserLeft: (data) => {
+      console.log("User left chat:", data);
+      // Add UI feedback when user leaves
+    }
+  });
+
+  useEffect(() => {
+    console.log("Socket ID from ChatBox.tsx:", getSocketId())
+  }, []);
+
   // handle initial chat setup
   useEffect(() => {
-    // Store current conversationId for cleanup
-    const currentConvId = conversationId;
+    console.group("Chat Initialization Flow");
 
     // Exit and clean up if we dont have necessary data
     if (!selectedUserId || !user?.sub) {
-      cleanup(currentConvId);
+      cleanup(conversationId);
+      console.groupEnd();
       return;
     }
 
-    const initializeChat = async () => {
-      console.group("Chat Intialization Flow");
-      try {
-        // Always cleanup previous conversation before starting a new one
-        if (currentConvId) {
-          cleanup(currentConvId);
-        }
-
-        // Connect to WebSocket (initialize new conversation)
-        socketService.connect();
-
-        // Load user and conversation data
-        userFetcher.load(`/api/users/${selectedUserId}`);
-        console.log("Loading user details:", selectedUserId);
-
-        // Create or get conversation between users
-        if (selectedUserId && user?.sub) {
-          conversationFetcher.submit(
-            {
-              userId1: user.sub,
-              userId2: selectedUserId
-            },
-            {
-              method: "post",
-              action: "/api/conversations/create"
-            }
-          );
-
-          console.log("Conversation request submitted");
-        }
-      } catch (error) {
-        console.error("Initialization error:", error);
+    // Load user data and create conversation in parallel
+    userFetcher.load(`/api/users/${selectedUserId}`);
+    conversationFetcher.submit(
+      {
+        userId1: user.sub,
+        userId2: selectedUserId
+      },
+      {
+        method: "post",
+        action: "/api/conversations/create"
       }
-      console.groupEnd();
-    }
+    );
 
-    initializeChat();
+    // Cleanup function
+    return () => {
+      cleanup(conversationId);
+      console.groupEnd();
+    };
   }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
 
   useEffect(() => {
@@ -111,7 +121,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     setConversationId(response.conversationId);
 
     // Join the WebSocket room for this conversation
-    socketService.joinConversation(response.conversationId);
+    joinConversation(response.conversationId);
 
     // Load existing messages
     messagesFetcher.load(`/api/messages/${response.conversationId}`);
@@ -135,86 +145,12 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     console.groupEnd();
   }, [messagesFetcher.data]);
 
-  useEffect(() => {
-    if (!conversationId) return;
-
-    const handleNewMessage = (message: SerializeFrom<MessageWithSender>) => {
-      console.log("New Message received");
-      setMessages(prevMessages => {
-        if (prevMessages.some(m => m.id === message.id)) {
-          return prevMessages;
-        }
-        return [...prevMessages, message];
-      });
-      scrollToBottom(true);
-    };
-
-    const handleUserJoined = (data: { userId: string, conversationId: string }) => {
-      console.log("User joined chat:", data);
-      // Add UI feedback when user joins
-    }
-
-    const handleUserLeft = (data: {
-      userId: string,
-      conversationId: string,
-      reason: "left" | "disconnected"
-    }) => {
-      console.log("User left chat:", data);
-      // Add UI feedback when user leaves
-    };
-
-    // Register socket event handlers
-    socketService.onNewMessage(handleNewMessage);
-    socketService.onUserJoined(handleUserJoined);
-    socketService.onUserLeft(handleUserLeft);
-
-    return () => {
-      // Cleanup event handlers
-      socketService.removeMessageHandler(handleNewMessage);
-      socketService.removeUserJoinedHandler(handleUserJoined);
-      socketService.removeUserLeftHandler(handleUserLeft);
-    };
-  }, [conversationId]);
-
-  useEffect(() => {
-    // Only set up listeners if we have a selected user
-    if (!selectedUserId || !user?.sub) return;
-
-    const socket = socketService.getSocket();
-    if (!socket) return;
-
-    // Handle connect event
-    const handleConnect = () => {
-      console.log("Socket connected");
-      setIsConnected(true);
-    }
-
-    // Handle disconnect event
-    const handleDisconnect = () => {
-      console.log("Socket disconnected");
-      setIsConnected(false);
-    }
-
-    // Set initial connection state
-    setIsConnected(socket.connected);
-
-    // Add event listeners
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-
-    // Cleanup listeners when component unmounts or selected user changes
-    return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
-    };
-  }, [selectedUserId, user?.sub]);
-
   // Handle user logout
   useEffect(() => {
     const handleLogout = () => {
       if (conversationId) {
         console.log("Logging out, leaving conversation:", conversationId);
-        socketService.leaveConversation(conversationId);
+        leaveConversation(conversationId);
         setConversationId(null);
         setMessages([]);
       }
@@ -236,8 +172,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       // Add the new message to the messages list
       setMessages((prevMessages) => [...prevMessages, serializedMessage]);
   
-      // Emit the message via Socket.IO to notify other clients
-      socketService.getSocket()?.emit("send-message", {
+      // Send the message via the context
+      sendMessage({
         content: serializedMessage.content,
         conversationId: serializedMessage.conversationId,
         senderId: serializedMessage.senderId,
@@ -319,3 +255,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     </div>
   );
 }
+
+// ChatBox.whyDidYouRender = true;
+// const ChatBoxComponent = React.memo(ChatBox);
+
+// export default ChatBoxComponent;

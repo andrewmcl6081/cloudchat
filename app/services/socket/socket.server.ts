@@ -16,7 +16,6 @@ export class SocketServer {
   private socketRooms: Map<string, Set<string>> = new Map(); // socketId -> Set of roomIds
 
   private constructor() {
-    this.log('SocketServer constructor called');
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

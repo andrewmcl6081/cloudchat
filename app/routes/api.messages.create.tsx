@@ -3,7 +3,7 @@ import { MessageService } from "~/services/message.server";
 import type { CreateMessagePayload, MessageError, SendMessageResponse } from "~/types";
 
 // POST /api/messages/create
-// Creates a new message and broadcasts it via Socket.IO
+// Creates a new message in database
 export const action: ActionFunction = async ({ request }) => {
   const formData = await request.formData();
   const content = formData.get("content");
