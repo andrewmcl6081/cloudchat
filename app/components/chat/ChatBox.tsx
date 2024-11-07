@@ -33,24 +33,15 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Socket Context
-  const { isConnected, joinConversation, leaveConversation, sendMessage, getSocketId } = useSocketContext(); 
+  const { isConnected, joinConversation, leaveConversation, sendMessage, getSocketId } = useSocketContext();
 
-  const scrollToBottom = (smooth = true) => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-    }, 0);
-  };
-
-  // Handle cleanup when user changes or logs out
-  const cleanup = (currentConversationId: string | null) => {
-    if (currentConversationId) {
-      console.log("Cleaning up conversation:", currentConversationId);
-      leaveConversation(currentConversationId);
-      setMessages([]);
-      setConversationId(null);
-      setMessageInput("");
+  useEffect(() => {
+    if (isConnected) {
+      console.log("Socket is connected. ID:", getSocketId());
+    } else {
+      console.log("Waiting for socket connection...");
     }
-  }
+  }, [isConnected, getSocketId]);
 
   // Socket event handlers
   useSocketEvent({
@@ -73,10 +64,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       // Add UI feedback when user leaves
     }
   });
-
-  useEffect(() => {
-    console.log("Socket ID from ChatBox.tsx:", getSocketId())
-  }, []);
 
   // handle initial chat setup
   useEffect(() => {
@@ -202,6 +189,31 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     setMessageInput('');
   };
+
+  const scrollToBottom = (smooth = true) => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    }, 0);
+  };
+
+  // Handle cleanup when user changes or logs out
+  const cleanup = (currentConversationId: string | null) => {
+    if (currentConversationId) {
+      console.log("Cleaning up conversation:", currentConversationId);
+      leaveConversation(currentConversationId);
+      setMessages([]);
+      setConversationId(null);
+      setMessageInput("");
+    }
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner size="small" />
+      </div>
+    );
+  }
 
   // Render empty state when no user selected
   if (!selectedUserId) {
