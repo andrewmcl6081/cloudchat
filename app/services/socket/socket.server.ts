@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import { SerializeFrom } from "@remix-run/node";
 import type { Server as HTTPServer } from "http";
+import type { Socket } from "socket.io";
 import type {
   ServerToClientEvents,
   ClientToServerEvents,
@@ -24,10 +25,15 @@ export class SocketServer {
 
   private constructor() {}
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private log(...args: any[]) {
+  private log(
+    category: "connection" | "room" | "message" | "error" | "status",
+    ...args: any[]
+  ) {
     if (this.debugMode) {
-      console.log("[Server Socket Service]", ...args);
+      console.log(
+        `[Server Socket Service][${category.toUpperCase()}]`,
+        ...args,
+      );
     }
   }
 
@@ -43,12 +49,20 @@ export class SocketServer {
     // Remove from socket's rooms
     const rooms = this.socketRooms.get(socketId);
     if (rooms) {
-      this.log(`Before removal - Socket ${socketId} rooms:`, Array.from(rooms));
+      this.log(
+        "room",
+        `Before removal - Socket ${socketId} rooms:`,
+        Array.from(rooms),
+      );
       rooms.delete(roomId);
-      this.log(`After removal - Socket ${socketId} rooms:`, Array.from(rooms));
+      this.log(
+        "room",
+        `After removal - Socket ${socketId} rooms:`,
+        Array.from(rooms),
+      );
       if (rooms.size === 0) {
         this.socketRooms.delete(socketId);
-        this.log(`Removed empty room set for socket ${socketId}`);
+        this.log("room", `Removed empty room set for socket ${socketId}`);
       }
     }
   }
@@ -57,7 +71,7 @@ export class SocketServer {
     const rooms = this.socketRooms.get(socketId);
     const socketIORooms =
       global.__socketIO?.sockets.sockets.get(socketId)?.rooms;
-    this.log(`Room state for ${socketId}:`, {
+    this.log("room", `Room state for ${socketId}:`, {
       tracked: Array.from(rooms || []),
       socketIO: Array.from(socketIORooms || []),
     });
@@ -78,11 +92,11 @@ export class SocketServer {
 
   public initialize(httpServer: HTTPServer) {
     if (this.initialized) {
-      this.log("SocketServer already initialized, skipping...");
+      this.log("connection", "SocketServer already initialized, skipping...");
       return global.__socketIO!;
     }
 
-    this.log("Initializing SocketServer...");
+    this.log("connection", "Initializing SocketServer...");
 
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
@@ -102,7 +116,7 @@ export class SocketServer {
 
       this.setupEventHandlers();
       this.initialized = true;
-      this.log("Socket.IO server initialized successfully");
+      this.log("connection", "Socket.IO server initialized successfully");
     }
 
     return global.__socketIO;
@@ -141,211 +155,252 @@ export class SocketServer {
     global.__socketIO.on("connection", (socket) => {
       const userId = socket.handshake.auth?.userId;
 
-      if (userId) {
-        this.log(`User ${userId} connected with socket ${socket.id}`);
-
-        // Add user to online users set
-        this.onlineUsers.set(userId, { socketId: socket.id });
-        this.log(
-          "Updated onlineUsers map after connection:",
-          Array.from(this.onlineUsers.entries()),
-        );
-
-        // Notify other clients about this user's status change
-        socket.broadcast.emit("user-status-change", {
-          userId,
-          status: "online",
-        });
-        this.log(`Emitted user-status-change for ${userId} as online`);
-
-        // Handle request for initial online users list
-        socket.on("get-online-users", () => {
-          this.log("Client requested online users list");
-
-          // Convert the map to an array, filtering out the requesting user
-          const onlineUsersList = Array.from(this.onlineUsers.entries())
-            .filter(([userId, _]) => userId !== socket.handshake.auth?.userId) // Filter out self
-            .map(([userId, value]) => ({
-              userId,
-              socketId: value.socketId,
-            }));
-
-          this.log("Sending online users list:", onlineUsersList);
-          socket.emit("initial-online-users", onlineUsersList);
-        });
+      if (!userId) {
+        this.log("error", "Connection attempted without userId");
+        socket.disconnect();
+        return;
       }
 
-      // Handle client joining a conversation
-      socket.on("join-conversation", async (conversationId: string) => {
-        try {
-          // First check if already in room from reconnection
-          const room = await global.__socketIO?.in(conversationId).allSockets();
-          const isInRoom = room?.has(socket.id) || false;
-
-          if (isInRoom) {
-            this.log(
-              `Socket ${socket.id} reconnected to room ${conversationId}`,
-            );
-            this.addSocketToRoom(socket.id, conversationId); // Update our tracking
-            return;
-          }
-
-          // Get current rooms and leave them before joining new one
-          const currentRooms = Array.from(
-            this.socketRooms.get(socket.id) || [],
-          );
-          for (const roomId of currentRooms) {
-            socket.leave(roomId);
-            this.removeSocketFromRoom(socket.id, roomId);
-          }
-
-          this.log(
-            `Current rooms for socket ${socket.id} before joining:`,
-            Array.from(this.socketRooms.get(socket.id) || []),
-          );
-
-          // Join the room
-          await socket.join(conversationId);
-          this.addSocketToRoom(socket.id, conversationId);
-
-          // Log rooms after joining
-          this.log(
-            `Current rooms for socket ${socket.id} after joining:`,
-            Array.from(this.socketRooms.get(socket.id) || []),
-          );
-
-          // Only emit user-joined for new joins (not reconnects)
-          socket.to(conversationId).emit("user-joined", {
-            conversationId,
-            userId: socket.id,
-          });
-
-          // Log final room state
-          const updatedRoom = await global.__socketIO
-            ?.in(conversationId)
-            .allSockets();
-          this.log(
-            `Room ${conversationId} members:`,
-            Array.from(updatedRoom || []),
-          );
-        } catch (error) {
-          this.log("Error in join-conversation:", error);
-        }
-      });
-
-      // Handle client leaving a conversation
-      socket.on("leave-conversation", (conversationId: string) => {
-        try {
-          const currentRooms = Array.from(
-            this.socketRooms.get(socket.id) || [],
-          );
-
-          // Only proceed if socket is actually in this room
-          if (!currentRooms.includes(conversationId)) {
-            this.log(
-              `Socket ${socket.id} attempted to leave room ${conversationId} but wasn't in it`,
-            );
-            return;
-          }
-
-          // Debug logs
-          console.log("\nLeave Conversation Debug:");
-          console.log("Socket ID:", socket.id);
-          console.log("Attempting to leave:", conversationId);
-          console.log("Server tracked rooms:", currentRooms);
-          console.log("Socket.IO rooms:", Array.from(socket.rooms));
-
-          // Emit to the other clients that we are leaving conversation
-          socket.to(conversationId).emit("user-left", {
-            conversationId,
-            userId: socket.id,
-            reason: "left",
-          });
-
-          // Leave conversation
-          socket.leave(conversationId);
-          this.removeSocketFromRoom(socket.id, conversationId);
-
-          // Logging
-          console.log(
-            "Rooms after leaving:",
-            Array.from(this.socketRooms.get(socket.id) || []),
-          );
-          console.log(
-            "Socket.IO rooms after leaving:",
-            Array.from(socket.rooms),
-          );
-          console.log("Leave Conversation Debug End\n");
-        } catch (error) {
-          this.log("Error in leave-conversation:", error);
-        }
-      });
-
-      // Handle disconnects (browser close, tab close, etc)
-      socket.on("disconnecting", () => {
-        const rooms = this.getSocketRooms(socket.id);
-        this.log(`Socket ${socket.id} disconnecting from rooms:`, rooms);
-
-        // Notify all rooms this socket is in
-        rooms.forEach((roomId) => {
-          socket.to(roomId).emit("user-left", {
-            conversationId: roomId,
-            userId: socket.id,
-            reason: "disconnected",
-          });
-          this.removeSocketFromRoom(socket.id, roomId);
-        });
-      });
-
-      // Handle client disconnection
-      socket.on("disconnect", () => {
-        const rooms = this.getSocketRooms(socket.id);
-
-        // Notify other clients that this user is now offline and remove them from online users set
-        if (userId) {
-          this.onlineUsers.delete(userId);
-          this.log(
-            "Updating onlineUsers map after disconnection:",
-            Array.from(this.onlineUsers.entries()),
-          );
-
-          socket.broadcast.emit("user-status-change", {
-            userId,
-            status: "offline",
-          });
-          this.log(`Emitted user-status-change for ${userId} as offline`);
-        }
-
-        // Remove socket from all rooms it was part of
-        rooms.forEach((roomId) => {
-          this.removeSocketFromRoom(socket.id, roomId);
-        });
-
-        this.log("Client Disconnected:", socket.id);
-      });
-
-      socket.on("send-message", (data) => {
-        try {
-          // Verify sender is in the conversation
-          if (!this.getSocketRooms(socket.id).includes(data.conversationId)) {
-            this.log(
-              `Message not broadcast - socket not in room ${data.conversationId}`,
-            );
-            return;
-          }
-
-          const messageData = this.createMessageData(data);
-          socket.to(data.conversationId).emit("new-message", messageData);
-
-          this.log(`Message sent in conversation ${data.conversationId}`, {
-            socketId: socket.id,
-            roomSize: this.getSocketRoomSize(data.conversationId),
-          });
-        } catch (error) {
-          this.log("Error handling send-message:", error);
-        }
-      });
+      this.handleUserConnection(socket, userId);
+      this.setupMessageHandlers(socket, userId);
+      this.setupRoomHandlers(socket, userId);
+      this.setupDisconnectHandlers(socket, userId);
     });
+  }
+
+  // Connection handling
+  private handleUserConnection(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
+  ) {
+    this.log(
+      "connection",
+      `User ${userId} connected with socket ${socket?.id}`,
+    );
+
+    this.onlineUsers.set(userId, { socketId: socket.id });
+    this.log(
+      "status",
+      "Updated onlineUsers map after connection:",
+      Array.from(this.onlineUsers.entries()),
+    );
+
+    // Broadcast user's online status
+    socket.broadcast.emit("user-status-change", {
+      userId,
+      status: "online",
+    });
+    this.log("status", `Emitted user-status-change for ${userId} as online`);
+
+    // Set up initial online users request handler
+    socket.on("get-online-users", () => this.handleGetOnlineUsers(socket));
+  }
+
+  private handleGetOnlineUsers(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  ) {
+    this.log("status", "Client requested online users list");
+
+    const onlineUsersList = Array.from(this.onlineUsers.entries())
+      .filter(([userId, _]) => userId !== socket.handshake.auth?.userId) // Filter out self
+      .map(([userId, value]) => ({
+        userId,
+        socketId: value.socketId,
+      }));
+
+    this.log("status", "Sending online users list:", onlineUsersList);
+    socket.emit("initial-online-users", onlineUsersList);
+  }
+
+  private setupMessageHandlers(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
+  ) {
+    socket.on("send-message", (data: any) =>
+      this.handleSendMessage(socket, data),
+    );
+  }
+
+  private handleSendMessage(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    data: any,
+  ) {
+    try {
+      // Verify sender is in the conversation
+      if (!this.getSocketRooms(socket.id).includes(data.conversationId)) {
+        this.log(
+          "error",
+          `Message not broadcast - socket not in room ${data.conversationId}`,
+        );
+        return;
+      }
+
+      const messageData = this.createMessageData(data);
+      socket.to(data.conversationId).emit("new-message", messageData);
+
+      this.log(
+        "message",
+        `Message sent in conversation ${data.conversationId}`,
+        {
+          socketId: socket.id,
+          roomSize: this.getSocketRoomSize(data.conversationId),
+        },
+      );
+    } catch (error) {
+      this.log("error", "Error handling send-message:", error);
+    }
+  }
+
+  // Room handling
+  private setupRoomHandlers(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
+  ) {
+    socket.on("join-conversation", (conversationId: string) =>
+      this.handleJoinConversation(socket, conversationId),
+    );
+
+    socket.on("leave-conversation", (conversationId: string) =>
+      this.handleLeaveConversation(socket, conversationId),
+    );
+  }
+
+  private async handleJoinConversation(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    conversationId: string,
+  ) {
+    try {
+      const room = await global.__socketIO?.in(conversationId).allSockets();
+      const isInRoom = room?.has(socket.id) || false;
+
+      if (isInRoom) {
+        this.log(
+          "room",
+          `Socket ${socket.id} already in room ${conversationId}`,
+        );
+        this.addSocketToRoom(socket.id, conversationId);
+        return;
+      }
+
+      // Leave current rooms
+      await this.leaveCurrentRooms(socket);
+      this.log(
+        "room",
+        `Current rooms for socket ${socket.id} before joining:`,
+        Array.from(this.socketRooms.get(socket.id) || []),
+      );
+
+      // Join new room
+      await socket.join(conversationId);
+      this.addSocketToRoom(socket.id, conversationId);
+      this.log(
+        "room",
+        `Current rooms for socket ${socket.id} after joining:`,
+        Array.from(this.socketRooms.get(socket.id) || []),
+      );
+
+      // Notify others
+      socket.to(conversationId).emit("user-joined", {
+        conversationId,
+        userId: socket.id,
+      });
+      this.log("room", `Socket ${socket.id} joined room ${conversationId}`);
+    } catch (error) {
+      this.log("error", "Error in join-conversation:", error);
+    }
+  }
+
+  private async leaveCurrentRooms(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  ) {
+    const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
+    for (const roomId of currentRooms) {
+      await socket.leave(roomId);
+      this.removeSocketFromRoom(socket.id, roomId);
+    }
+  }
+
+  private handleLeaveConversation(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    conversationId: string,
+  ) {
+    try {
+      const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
+
+      if (!currentRooms.includes(conversationId)) {
+        this.log("room", `Socket ${socket.id} not in room ${conversationId}`);
+        return;
+      }
+
+      // Notify and leave
+      socket.to(conversationId).emit("user-left", {
+        conversationId,
+        userId: socket.id,
+        reason: "left",
+      });
+
+      socket.leave(conversationId);
+      this.removeSocketFromRoom(socket.id, conversationId);
+      this.log("room", `Socket ${socket.id} left room ${conversationId}`);
+    } catch (error) {
+      this.log("error", "Error in leave-conversation:", error);
+    }
+  }
+
+  private setupDisconnectHandlers(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
+  ) {
+    socket.on("disconnecting", () => this.handleDisconnecting(socket));
+    socket.on("disconnect", () => this.handleDisconnect(socket, userId));
+  }
+
+  private handleDisconnecting(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+  ) {
+    const rooms = this.getSocketRooms(socket.id);
+    this.log(
+      "connection",
+      `Socket ${socket.id} disconnecting from rooms:`,
+      rooms,
+    );
+
+    rooms.forEach((roomId) => {
+      socket.to(roomId).emit("user-left", {
+        conversationId: roomId,
+        userId: socket.id,
+        reason: "disconnected",
+      });
+      this.removeSocketFromRoom(socket.id, roomId);
+    });
+  }
+
+  private handleDisconnect(
+    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
+  ) {
+    const rooms = this.getSocketRooms(socket.id);
+
+    if (userId) {
+      this.onlineUsers.delete(userId);
+      this.log(
+        "status",
+        "Updating onlineUsers map after disconnection:",
+        Array.from(this.onlineUsers.entries()),
+      );
+
+      socket.broadcast.emit("user-status-change", {
+        userId,
+        status: "offline",
+      });
+      this.log("status", `Emitted user-status-change for ${userId} as offline`);
+    }
+
+    // Remove socket from all rooms it was part of
+    rooms.forEach((roomId) => {
+      this.removeSocketFromRoom(socket.id, roomId);
+    });
+    this.log("connection", "Client Disconnected:", socket.id);
   }
 
   public emit(
@@ -354,17 +409,17 @@ export class SocketServer {
     data: SerializeFrom<MessageWithSender>,
   ) {
     if (!global.__socketIO) {
-      this.log("Socket.IO not initialized!");
+      this.log("connection", "Socket.IO not initialized!");
       return;
     }
 
     try {
       global.__socketIO.to(room).emit(event, data);
-      this.log(`Event ${event} emitted to room ${room}`, {
+      this.log("connection", `Event ${event} emitted to room ${room}`, {
         roomSize: this.getSocketRoomSize(room),
       });
     } catch (error) {
-      this.log(`Error emitting event ${event}:`, error);
+      this.log("error", `Error emitting event ${event}:`, error);
     }
   }
 
