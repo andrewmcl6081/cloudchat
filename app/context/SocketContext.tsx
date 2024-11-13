@@ -22,14 +22,17 @@ const defaultContextValue: SocketContextType = {
   removeUserJoinedListener: () => undefined,
   addUserLeftListener: () => undefined,
   removeUserLeftListener: () => undefined,
+  addUserStatusListener: () => undefined,
+  removeUserStatusListener: () => undefined,
+  addInitialOnlineUsersListener: () => undefined,
+  removeInitialOnlineUsersListener: () => undefined,
   getSocketId: () => null,
 };
 
 // Provider component that wraps part of the app that needs socket access
 export function SocketProvider({ children }: { children: ReactNode }) {
-  // Maintain socket state and connection status through context
   const [contextValue, setContextValue] = useState<SocketContextType>(defaultContextValue);
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading, user } = useAuth0();
 
   useEffect(() => {
     // Skip socket initialization if:
@@ -39,7 +42,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
 
     // Initialize the socket and set up context values and listeners
-    const socketInstance = socketService.connect();
+    const socketInstance = socketService.connect({ userId: user?.sub });
+
     if (socketInstance) {
       // Create bound socket method references
       // These methods are provided by our socket service and handle:
@@ -56,6 +60,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         removeUserJoinedListener: socketService.removeUserJoinedListener.bind(socketService),
         addUserLeftListener: socketService.addUserLeftListener.bind(socketService),
         removeUserLeftListener: socketService.removeUserLeftListener.bind(socketService),
+        addUserStatusListener: socketService.addUserStatusListener.bind(socketService),
+        removeUserStatusListener: socketService.removeUserStatusListener.bind(socketService),
+        addInitialOnlineUsersListener: socketService.addInitialOnlineUsersListener.bind(socketService),
+        removeInitialOnlineUsersListener: socketService.removeInitialOnlineUsersListener.bind(socketService),
         getSocketId: socketService.getSocketId.bind(socketService),
       };
 
@@ -97,7 +105,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socketService.disconnect();
       setContextValue(defaultContextValue);
     };
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, user?.sub]);
 
   return (
     <SocketContext.Provider value={contextValue}>
