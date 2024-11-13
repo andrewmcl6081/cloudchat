@@ -161,13 +161,14 @@ export class SocketServer {
         // Handle request for initial online users list
         socket.on("get-online-users", () => {
           this.log("Client requested online users list");
-          // Conver the map to an array of objects with userId
-          const onlineUsersList = Array.from(this.onlineUsers.entries()).map(
-            ([userId, value]) => ({
+
+          // Convert the map to an array, filtering out the requesting user
+          const onlineUsersList = Array.from(this.onlineUsers.entries())
+            .filter(([userId, _]) => userId !== socket.handshake.auth?.userId) // Filter out self
+            .map(([userId, value]) => ({
               userId,
               socketId: value.socketId,
-            }),
-          );
+            }));
 
           this.log("Sending online users list:", onlineUsersList);
           socket.emit("initial-online-users", onlineUsersList);

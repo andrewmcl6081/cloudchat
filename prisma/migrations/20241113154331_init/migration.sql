@@ -4,6 +4,8 @@ CREATE TABLE "users" (
     "auth0_id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "display_name" TEXT,
+    "picture" TEXT,
+    "lastActive" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

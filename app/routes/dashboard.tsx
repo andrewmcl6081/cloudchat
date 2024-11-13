@@ -16,7 +16,6 @@ export default function Dashboard() {
   useEffect(() => {
     // Only attempt to sync if we have the required user data
     if (user?.sub && user?.email) {
-
       // Create FormData object - this is what Remix expects
       const formData = new FormData();
 
@@ -34,14 +33,14 @@ export default function Dashboard() {
 
       // Submit the FormData to our sync endpoint
       fetcher.submit(
-        formData,  // FormData object instead of plain object
-        { 
-          method: "post",  // Use POST method
-          action: "/api/auth/sync"  // Endpoint to handle the sync
-        }
+        formData, // FormData object instead of plain object
+        {
+          method: "post", // Use POST method
+          action: "/api/auth/sync", // Endpoint to handle the sync
+        },
       );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]); // Re-run effect if user object changes
 
   return (
@@ -56,8 +55,10 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <span className="text-gray-700">{user?.email}</span>
                 <button
-                  onClick={() => 
-                    logout({ logoutParams: { returnTo: window.location.origin } })
+                  onClick={() =>
+                    logout({
+                      logoutParams: { returnTo: window.location.origin },
+                    })
                   }
                   className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
                 >
@@ -74,9 +75,7 @@ export default function Dashboard() {
             onSelect={setSelectedUserId}
           />
           <main className="flex-1">
-            <ChatBox
-              selectedUserId={selectedUserId}
-            />
+            <ChatBox selectedUserId={selectedUserId} />
           </main>
         </div>
       </div>

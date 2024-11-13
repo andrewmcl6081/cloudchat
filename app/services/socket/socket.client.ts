@@ -1,5 +1,10 @@
 import { io, Socket } from "socket.io-client";
-import type { MessageWithSender, ClientToServerEvents, ServerToClientEvents, OnlineUserData } from "~/types";
+import type {
+  MessageWithSender,
+  ClientToServerEvents,
+  ServerToClientEvents,
+  OnlineUserData,
+} from "~/types";
 import type { SerializeFrom } from "@remix-run/node";
 
 // Create a type for our socket instance with proper event typing
@@ -15,18 +20,26 @@ export class SocketService {
   private isReconnecting: boolean = false;
 
   // Store message handlers for components that want to receive messages
-  private messageHandlers: Set<(message: SerializeFrom<MessageWithSender>) => void> = new Set();
-  private userJoinedHandlers: Set<(data: { userId: string; conversationId: string; }) => void> = new Set();
-  private userStatusHandlers: Set<(data: { userId: string; status: string }) => void> = new Set(); // New set for user status changes
-  private initialOnlineUsersHandlers: Set<(users: OnlineUserData[]) => void> = new Set();
-  private userLeftHandlers: Set<(data: {
-    userId: string;
-    conversationId: string;
-    reason: "left" | "disconnected";
-  }) => void> = new Set();
+  private messageHandlers: Set<
+    (message: SerializeFrom<MessageWithSender>) => void
+  > = new Set();
+  private userJoinedHandlers: Set<
+    (data: { userId: string; conversationId: string }) => void
+  > = new Set();
+  private userStatusHandlers: Set<
+    (data: { userId: string; status: string }) => void
+  > = new Set(); // New set for user status changes
+  private initialOnlineUsersHandlers: Set<(users: OnlineUserData[]) => void> =
+    new Set();
+  private userLeftHandlers: Set<
+    (data: {
+      userId: string;
+      conversationId: string;
+      reason: "left" | "disconnected";
+    }) => void
+  > = new Set();
 
-  private constructor() {
-  }
+  private constructor() {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private log(...args: any[]) {
@@ -138,24 +151,27 @@ export class SocketService {
       }
     });
 
-    this.socket.on("user-status-change", (data: { userId: string; status: string }) => {
-      this.log("User status change received:", data);
-      this.userStatusHandlers.forEach(handler => handler(data));
-    })
+    this.socket.on(
+      "user-status-change",
+      (data: { userId: string; status: string }) => {
+        this.log("User status change received:", data);
+        this.userStatusHandlers.forEach((handler) => handler(data));
+      },
+    );
 
     this.socket.on("user-joined", (data) => {
       this.log("User joined:", data);
-      this.userJoinedHandlers.forEach(handler => handler(data));
+      this.userJoinedHandlers.forEach((handler) => handler(data));
     });
 
     this.socket.on("user-left", (data) => {
       this.log("User left:", data);
-      this.userLeftHandlers.forEach(handler => handler(data));
+      this.userLeftHandlers.forEach((handler) => handler(data));
     });
 
     this.socket.on("new-message", (message) => {
       this.log("Message received:", message.id);
-      this.messageHandlers.forEach(handler => {
+      this.messageHandlers.forEach((handler) => {
         try {
           handler(message);
         } catch (error) {
@@ -166,7 +182,7 @@ export class SocketService {
 
     this.socket.on("initial-online-users", (users) => {
       this.log("Received initial online users:", users);
-      this.initialOnlineUsersHandlers.forEach(handler => {
+      this.initialOnlineUsersHandlers.forEach((handler) => {
         try {
           handler(users);
         } catch (error) {
@@ -176,7 +192,11 @@ export class SocketService {
     });
   }
 
-  public sendMessage(data: { content: string; conversationId: string; senderId: string }) {
+  public sendMessage(data: {
+    content: string;
+    conversationId: string;
+    senderId: string;
+  }) {
     if (!this.ensureConnection()) {
       this.log("Cannot send message: socket is not connected");
       return;
@@ -193,7 +213,7 @@ export class SocketService {
       // Let Socket.IO handle reconnection
       return false;
     }
-  
+
     return true;
   }
 
@@ -211,7 +231,7 @@ export class SocketService {
     }
 
     // Leave any existing rooms first
-    this.activeRooms.forEach(roomId => {
+    this.activeRooms.forEach((roomId) => {
       if (roomId !== conversationId) {
         this.log(`Leaving room ${roomId} before joining ${conversationId}`);
         this.leaveConversation(roomId);
@@ -237,66 +257,86 @@ export class SocketService {
   }
 
   private rejoinActiveRooms() {
-    this.activeRooms.forEach(roomId => {
+    this.activeRooms.forEach((roomId) => {
       this.log("Rejoining room after reconnect:", roomId);
       this.socket?.emit("join-conversation", roomId);
-    })
+    });
   }
 
-  public addInitialOnlineUsersListener(handler: (users: OnlineUserData[]) => void) {
+  public addInitialOnlineUsersListener(
+    handler: (users: OnlineUserData[]) => void,
+  ) {
     this.log("Registering initial status handler");
     this.initialOnlineUsersHandlers.add(handler);
   }
 
-  public removeInitialOnlineUsersListener(handler: (users: OnlineUserData[]) => void) {
+  public removeInitialOnlineUsersListener(
+    handler: (users: OnlineUserData[]) => void,
+  ) {
     this.log("Removing initial status handler");
     this.initialOnlineUsersHandlers.delete(handler);
   }
 
-  public addUserStatusListener(handler: (data: { userId: string; status: string; }) => void) {
+  public addUserStatusListener(
+    handler: (data: { userId: string; status: string }) => void,
+  ) {
     this.log("Registering new status handler");
     this.userStatusHandlers.add(handler);
   }
 
-  public removeUserStatusListener(handler: (data: { userId: string; status: string; }) => void) {
+  public removeUserStatusListener(
+    handler: (data: { userId: string; status: string }) => void,
+  ) {
     this.log("Removing status handler");
     this.userStatusHandlers.delete(handler);
   }
 
-  public addNewMessageListener(handler: (message: SerializeFrom<MessageWithSender>) => void) {
+  public addNewMessageListener(
+    handler: (message: SerializeFrom<MessageWithSender>) => void,
+  ) {
     this.log("Registering new message handler");
     this.messageHandlers.add(handler);
   }
 
-  public removeNewMessageListener(handler: (message: SerializeFrom<MessageWithSender>) => void) {
+  public removeNewMessageListener(
+    handler: (message: SerializeFrom<MessageWithSender>) => void,
+  ) {
     this.log("Removing message handler");
     this.messageHandlers.delete(handler);
   }
 
-  public addUserJoinedListener(handler: (data: { userId: string; conversationId: string; }) => void) {
+  public addUserJoinedListener(
+    handler: (data: { userId: string; conversationId: string }) => void,
+  ) {
     this.log("Registering user joined handler");
     this.userJoinedHandlers.add(handler);
   }
 
-  public removeUserJoinedListener(handler: (data: { userId: string; conversationId: string; }) => void) {
+  public removeUserJoinedListener(
+    handler: (data: { userId: string; conversationId: string }) => void,
+  ) {
     this.log("Removing user joined handler");
     this.userJoinedHandlers.delete(handler);
   }
 
-  public addUserLeftListener(handler: (data: {
-    userId: string;
-    conversationId: string;
-    reason: "left" | "disconnected";
-  }) => void) {
+  public addUserLeftListener(
+    handler: (data: {
+      userId: string;
+      conversationId: string;
+      reason: "left" | "disconnected";
+    }) => void,
+  ) {
     this.log("Registering user left handler");
     this.userLeftHandlers.add(handler);
   }
 
-  public removeUserLeftListener(handler: (data: {
-    userId: string;
-    conversationId: string;
-    reason: "left" | "disconnected";
-  }) => void) {
+  public removeUserLeftListener(
+    handler: (data: {
+      userId: string;
+      conversationId: string;
+      reason: "left" | "disconnected";
+    }) => void,
+  ) {
     this.log("Removing user left handler");
     this.userLeftHandlers.delete(handler);
   }

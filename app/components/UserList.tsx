@@ -6,15 +6,7 @@ import LoadingSpinner from "~/components/LoadingSpinner";
 import { User } from "@prisma/client";
 import { SerializeFrom } from "@remix-run/node";
 import { useSocketEvent } from "~/hooks/useSocketEvent";
-
-interface UserListProps {
-  selectedUserId: string | null;
-  onSelect: (userId: string) => void;
-}
-
-interface UsersSearchResponse {
-  users: SerializeFrom<User>[];
-}
+import type { UserListProps, UsersSearchResponse } from "~/types";
 
 /**
  * UserList Component
@@ -24,9 +16,7 @@ interface UsersSearchResponse {
 export default function UserList({ selectedUserId, onSelect }: UserListProps) {
   const [searchInput, setSearchInput] = useState("");
   const [allUsers, setAllUsers] = useState<SerializeFrom<User>[]>([]);
-  const [onlineUsers, setOnlineUsers] = useState<Map<string, string>>(
-    new Map(),
-  );
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const fetcher = useFetcher<UsersSearchResponse>();
   const { user } = useAuth0();
 
@@ -34,22 +24,20 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
   useSocketEvent({
     onInitialOnlineUsers: (users) => {
       console.log("Received initial online users:", users);
-      const userMap = new Map(
-        users.map((user) => [user.userId, user.socketId]),
-      );
-      setOnlineUsers(userMap);
+      const userSet = new Set(users.map((user) => user.userId));
+      setOnlineUsers(userSet);
     },
     onUserStatus: (data) => {
       console.log("User status changed:", data);
       setOnlineUsers((prev) => {
-        const newMap = new Map(prev);
-        if (data.status == "online") {
-          newMap.set(data.userId, "online");
+        const newSet = new Set(prev);
+        if (data.status === "online") {
+          newSet.add(data.userId);
         } else {
-          newMap.delete(data.userId);
+          newSet.delete(data.userId);
         }
 
-        return newMap;
+        return newSet;
       });
     },
   });
@@ -64,6 +52,7 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
 
   // Update allUsers when data is fetched
   useEffect(() => {
+    console.log("USERS:", fetcher.data?.users);
     if (fetcher.data?.users) {
       setAllUsers(fetcher.data.users);
     }
