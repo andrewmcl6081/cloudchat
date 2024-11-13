@@ -126,7 +126,6 @@ export class SocketServer {
         auth0Id: data.senderId,
         displayName: null,
         picture: null,
-        isOnline: true,
         lastActive: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

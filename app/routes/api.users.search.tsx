@@ -1,6 +1,6 @@
 import { User } from "@prisma/client";
 import { json, type LoaderFunction } from "@remix-run/node";
-import { UserService } from "~/services/user.server";
+import { UserService } from "~/services/user/user.server";
 
 export type UsersSearchLoaderData = {
   users: User[];
@@ -17,4 +17,4 @@ export const loader: LoaderFunction = async ({ request }) => {
   // Get all users except current user
   const users = await UserService.getAllUsers(currentUserId);
   return json({ users });
-}
+};

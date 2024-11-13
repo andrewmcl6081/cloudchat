@@ -1,5 +1,5 @@
 import { json, type ActionFunction } from "@remix-run/node";
-import { UserService } from "~/services/user.server";
+import { UserService } from "~/services/user/user.server";
 
 export const action: ActionFunction = async ({ request }) => {
   try {
@@ -10,10 +10,7 @@ export const action: ActionFunction = async ({ request }) => {
     const picture = formData.get("picture");
 
     if (!sub || !email) {
-      return json(
-        { error: "Missing required user data." },
-        { status: 400 }
-      );
+      return json({ error: "Missing required user data." }, { status: 400 });
     }
 
     const user = await UserService.findOrCreate({
@@ -24,13 +21,12 @@ export const action: ActionFunction = async ({ request }) => {
     });
 
     return json({ user });
-  } 
-  catch (error) {
+  } catch (error) {
     console.error("Sync error:", error);
 
     return json(
       { error: "Failed to sync user data with database." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 };
