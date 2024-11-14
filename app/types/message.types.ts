@@ -27,8 +27,13 @@ export interface UseMessagesProps {
 
 export interface MessageListProps {
   messages: SerializeFrom<MessageWithSender>[];
-  currentUserId?: string;
+  userId?: string;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+}
+
+export interface MessageListItemProps {
+  message: SerializeFrom<MessageWithSender>;
+  userId?: string;
 }
 
 export interface MessageInputProps {

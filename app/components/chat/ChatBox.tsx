@@ -264,7 +264,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
       <MessageList
         messages={messages}
-        currentUserId={user?.sub}
+        userId={user?.sub}
         messagesEndRef={messagesEndRef}
       />
 

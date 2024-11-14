@@ -53,7 +53,6 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
 
   // Update allUsers when data is fetched
   useEffect(() => {
-    console.log("USERS:", fetcher.data?.users);
     if (fetcher.data?.users) {
       setAllUsers(fetcher.data.users);
     }
