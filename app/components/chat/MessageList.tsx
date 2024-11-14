@@ -11,14 +11,16 @@ export function MessageList({
         <div
           key={message.id}
           className={`flex ${
-            message.senderId === currentUserId ? "justify-end" : "justify-start"
+            message.sender.auth0Id === currentUserId
+              ? "justify-start"
+              : "justify-end"
           }`}
         >
           <div
             className={`rounded-lg px-4 py-2 max-w-[70%] ${
-              message.senderId === currentUserId
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 text-gray-900"
+              message.sender.auth0Id === currentUserId
+                ? "bg-gray-100 text-gray-900"
+                : "bg-blue-500 text-white"
             }`}
           >
             <p className="text-sm whitespace-pre-wrap break-words">
@@ -26,9 +28,9 @@ export function MessageList({
             </p>
             <span
               className={`text-xs ${
-                message.senderId === currentUserId
-                  ? "text-blue-100"
-                  : "text-gray-500"
+                message.sender.auth0Id === currentUserId
+                  ? "text-gray-500"
+                  : "text-blue-100"
               }`}
             >
               {new Date(message.createdAt).toLocaleTimeString()}
