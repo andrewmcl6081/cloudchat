@@ -6,6 +6,7 @@ import LoadingSpinner from "~/components/LoadingSpinner";
 import { User } from "@prisma/client";
 import { SerializeFrom } from "@remix-run/node";
 import { useSocketEvent } from "~/hooks/useSocketEvent";
+import { UserListItem } from "~/components/UserListItem";
 import type { UserListProps, UsersSearchResponse } from "~/types";
 
 /**
@@ -139,36 +140,13 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
               </span>
             </div>
             {groupedUsers.online.map((user) => (
-              <button
+              <UserListItem
                 key={user.id}
-                onClick={() => handleUserSelect(user.auth0Id)}
-                className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 transition-colors ${
-                  selectedUserId === user.auth0Id ? "bg-blue-50" : ""
-                }`}
-              >
-                <div className="flex-shrink-0 relative">
-                  {user.picture ? (
-                    <img
-                      src={user.picture}
-                      alt={`${user.email}'s profile`}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                      <UserIcon className="h-6 w-6 text-gray-500" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white bg-green-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  {user.displayName && (
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {user.displayName}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                </div>
-              </button>
+                user={user}
+                isSelected={selectedUserId === user.auth0Id}
+                onSelect={() => handleUserSelect(user.auth0Id)}
+                isOnline={true}
+              />
             ))}
           </div>
         )}
@@ -182,36 +160,13 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
               </span>
             </div>
             {groupedUsers.offline.map((user) => (
-              <button
+              <UserListItem
                 key={user.id}
-                onClick={() => handleUserSelect(user.auth0Id)}
-                className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 transition-colors ${
-                  selectedUserId === user.auth0Id ? "bg-blue-50" : ""
-                }`}
-              >
-                <div className="flex-shrink-0 relative">
-                  {user.picture ? (
-                    <img
-                      src={user.picture}
-                      alt={`${user.email}'s profile`}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                      <UserIcon className="h-6 w-6 text-gray-500" />
-                    </div>
-                  )}
-                  <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white bg-gray-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  {user.displayName && (
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {user.displayName}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                </div>
-              </button>
+                user={user}
+                isSelected={selectedUserId === user.auth0Id}
+                onSelect={() => handleUserSelect(user.auth0Id)}
+                isOnline={false}
+              />
             ))}
           </div>
         )}

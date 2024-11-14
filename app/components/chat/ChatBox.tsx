@@ -1,22 +1,22 @@
 // app/components/ChatBox.tsx
-import React, { useEffect, useState, useRef } from 'react';
-import { useFetcher } from '@remix-run/react';
+import React, { useEffect, useState, useRef } from "react";
+import { useFetcher } from "@remix-run/react";
 import { useAuth0 } from "@auth0/auth0-react";
 import type { SerializeFrom } from "@remix-run/node";
-import LoadingSpinner from '~/components/LoadingSpinner';
-import { UserLoaderData } from '~/routes/api.users.$userId';
-import { ChatHeader } from './ChatHeader';
-import { MessageList } from './MessageList';
-import { useSocketContext } from '~/hooks/useSocketContext';
-import { useSocketEvent } from '~/hooks/useSocketEvent';
-import type { 
-  MessageWithSender, 
-  SendMessageResponse, 
-  ConversationResponse, 
-  MessagesResponse, 
-  ChatBoxProps 
-} from '~/types';
-import { MessageInput } from './MessageInput';
+import LoadingSpinner from "~/components/LoadingSpinner";
+import { UserLoaderData } from "~/routes/api.users.$userId";
+import { ChatHeader } from "./ChatHeader";
+import { MessageList } from "./MessageList";
+import { useSocketContext } from "~/hooks/useSocketContext";
+import { useSocketEvent } from "~/hooks/useSocketEvent";
+import type {
+  MessageWithSender,
+  SendMessageResponse,
+  ConversationResponse,
+  MessagesResponse,
+  ChatBoxProps,
+} from "~/types";
+import { MessageInput } from "./MessageInput";
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
@@ -25,15 +25,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher<SendMessageResponse>();
   const { user } = useAuth0();
-  
+
   // State management
-  const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>([]);
-  const [messageInput, setMessageInput] = useState('');
+  const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>(
+    [],
+  );
+  const [messageInput, setMessageInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Socket Context
-  const { isConnected, joinConversation, leaveConversation, sendMessage, getSocketId } = useSocketContext();
+  const {
+    isConnected,
+    joinConversation,
+    leaveConversation,
+    sendMessage,
+    getSocketId,
+  } = useSocketContext();
 
   useEffect(() => {
     if (isConnected) {
@@ -47,8 +55,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   useSocketEvent({
     onNewMessage: (message) => {
       console.log("New Message Received:", message);
-      setMessages(prevMessages => {
-        if (prevMessages.some(m => m.id === message.id)) {
+      setMessages((prevMessages) => {
+        if (prevMessages.some((m) => m.id === message.id)) {
           return prevMessages;
         }
         return [...prevMessages, message];
@@ -62,7 +70,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     onUserLeft: (data) => {
       console.log("User left chat:", data);
       // Add UI feedback when user leaves
-    }
+    },
   });
 
   // handle initial chat setup
@@ -81,12 +89,12 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     conversationFetcher.submit(
       {
         userId1: user.sub,
-        userId2: selectedUserId
+        userId2: selectedUserId,
       },
       {
         method: "post",
-        action: "/api/conversations/create"
-      }
+        action: "/api/conversations/create",
+      },
     );
 
     // Cleanup function
@@ -114,7 +122,10 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     messagesFetcher.load(`/api/messages/${response.conversationId}`);
 
     // Logging
-    console.log("Requested messages for conversation:", response.conversationId);
+    console.log(
+      "Requested messages for conversation:",
+      response.conversationId,
+    );
     console.groupEnd();
   }, [conversationFetcher.data]);
 
@@ -148,17 +159,17 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     return () => {
       window.removeEventListener("auth0:logout", handleLogout);
-    }
+    };
   }, [conversationId]);
 
   useEffect(() => {
     // Access serializedMessage only if it exists in sendMessageFetcher.data
     if (sendMessageFetcher.data && sendMessageFetcher.data.serializedMessage) {
       const { serializedMessage } = sendMessageFetcher.data;
-  
+
       // Add the new message to the messages list
       setMessages((prevMessages) => [...prevMessages, serializedMessage]);
-  
+
       // Send the message via the context
       sendMessage({
         content: serializedMessage.content,
@@ -172,27 +183,29 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const handleSendMessage = async (event: React.FormEvent) => {
     console.log("Sending message to /api/messages/create");
     event.preventDefault();
-    
+
     if (!messageInput.trim() || !conversationId || !user?.sub) return;
 
     sendMessageFetcher.submit(
-      { 
+      {
         content: messageInput.trim(),
         conversationId,
         senderId: user.sub,
       },
-      { 
-        method: 'post',
-        action: '/api/messages/create'
-      }
+      {
+        method: "post",
+        action: "/api/messages/create",
+      },
     );
 
-    setMessageInput('');
+    setMessageInput("");
   };
 
   const scrollToBottom = (smooth = true) => {
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+      messagesEndRef.current?.scrollIntoView({
+        behavior: smooth ? "smooth" : "auto",
+      });
     }, 0);
   };
 
@@ -205,7 +218,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       setConversationId(null);
       setMessageInput("");
     }
-  }
+  };
 
   if (!isConnected) {
     return (
@@ -225,7 +238,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   }
 
   // Show loading state while fetching user data
-  if (userFetcher.state === 'loading') {
+  if (userFetcher.state === "loading") {
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingSpinner size="small" />
@@ -237,7 +250,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   // Show error state if user data couldn't be loaded
   if (!selectedUser) {
-    console.log("Selected user:", userFetcher)
+    console.log("Selected user:", userFetcher);
     return (
       <div className="flex items-center justify-center h-full text-red-500">
         <p>Could not load user information</p>
@@ -247,10 +260,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <ChatHeader
-        user={selectedUser}
-        isConnected={isConnected}
-      />
+      <ChatHeader user={selectedUser} isConnected={isConnected} />
 
       <MessageList
         messages={messages}
@@ -267,8 +277,3 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     </div>
   );
 }
-
-// ChatBox.whyDidYouRender = true;
-// const ChatBoxComponent = React.memo(ChatBox);
-
-// export default ChatBoxComponent;
