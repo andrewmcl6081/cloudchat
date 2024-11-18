@@ -9,6 +9,7 @@ import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { useSocketContext } from "~/hooks/useSocketContext";
 import { useSocketEvent } from "~/hooks/useSocketEvent";
+import { useMessages } from "~/context/MessagesContex";
 import type {
   MessageWithSender,
   SendMessageResponse,
@@ -27,40 +28,29 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const { user } = useAuth0();
 
   // State management
-  const [messages, setMessages] = useState<SerializeFrom<MessageWithSender>[]>(
-    [],
-  );
   const [messageInput, setMessageInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Socket Context
-  const {
-    isConnected,
-    joinConversation,
-    leaveConversation,
-    sendMessage,
-    getSocketId,
-  } = useSocketContext();
+  // Context
+  const { isConnected, joinConversation, leaveConversation, sendMessage } =
+    useSocketContext();
+  const { addMessage, setConversationMessages, clearConversation } =
+    useMessages();
 
-  useEffect(() => {
-    if (isConnected) {
-      console.log("Socket is connected. ID:", getSocketId());
-    } else {
-      console.log("Waiting for socket connection...");
-    }
-  }, [isConnected, getSocketId]);
+  // useEffect(() => {
+  //   if (isConnected) {
+  //     console.log("Socket is connected. ID:", getSocketId());
+  //   } else {
+  //     console.log("Waiting for socket connection...");
+  //   }
+  // }, [isConnected, getSocketId]);
 
   // Socket event handlers
   useSocketEvent({
     onNewMessage: (message) => {
       console.log("New Message Received:", message);
-      setMessages((prevMessages) => {
-        if (prevMessages.some((m) => m.id === message.id)) {
-          return prevMessages;
-        }
-        return [...prevMessages, message];
-      });
+      addMessage(message.conversationId, message);
       scrollToBottom(true);
     },
     onUserJoined: (data) => {
@@ -76,7 +66,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // handle initial chat setup
   useEffect(() => {
     console.group("Chat Initialization Flow");
-
     // Exit and clean up if we dont have necessary data
     if (!selectedUserId || !user?.sub) {
       cleanup(conversationId);
@@ -106,26 +95,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   useEffect(() => {
     //Check if we have conversation data from the API
-    const response = conversationFetcher.data;
-    if (!response?.conversationId) return;
+    if (!conversationFetcher.data?.conversationId) return;
+    const newConversationId = conversationFetcher.data.conversationId;
 
     console.group("Conversation Setup Flow");
-    console.log("Setting up conversation:", response.conversationId);
+    console.log("Setting up conversation:", newConversationId);
 
     // Store conversation ID in state
-    setConversationId(response.conversationId);
+    setConversationId(newConversationId);
 
     // Join the WebSocket room for this conversation
-    joinConversation(response.conversationId);
+    joinConversation(newConversationId);
 
     // Load existing messages
-    messagesFetcher.load(`/api/messages/${response.conversationId}`);
+    messagesFetcher.load(`/api/messages/${newConversationId}`);
 
     // Logging
-    console.log(
-      "Requested messages for conversation:",
-      response.conversationId,
-    );
+    console.log("Requested messages for conversation:", newConversationId);
     console.groupEnd();
   }, [conversationFetcher.data]);
 
@@ -135,9 +121,9 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       return;
     }
 
-    if (messagesFetcher.data?.messages) {
-      setMessages(messagesFetcher.data.messages);
-      scrollToBottom(false);
+    if (messagesFetcher.data?.messages && conversationId) {
+      setConversationMessages(conversationId, messagesFetcher.data.messages);
+      scrollToBottom(true);
     }
 
     console.groupEnd();
@@ -149,8 +135,8 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       if (conversationId) {
         console.log("Logging out, leaving conversation:", conversationId);
         leaveConversation(conversationId);
+        clearConversation(conversationId);
         setConversationId(null);
-        setMessages([]);
       }
     };
 
@@ -164,11 +150,11 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   useEffect(() => {
     // Access serializedMessage only if it exists in sendMessageFetcher.data
-    if (sendMessageFetcher.data && sendMessageFetcher.data.serializedMessage) {
+    if (sendMessageFetcher.data?.serializedMessage && conversationId) {
       const { serializedMessage } = sendMessageFetcher.data;
 
       // Add the new message to the messages list
-      setMessages((prevMessages) => [...prevMessages, serializedMessage]);
+      addMessage(conversationId, serializedMessage);
 
       // Send the message via the context
       sendMessage({
@@ -214,13 +200,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     if (currentConversationId) {
       console.log("Cleaning up conversation:", currentConversationId);
       leaveConversation(currentConversationId);
-      setMessages([]);
+      clearConversation(currentConversationId);
       setConversationId(null);
       setMessageInput("");
     }
   };
 
+  console.group("Render:");
+  console.log("userFetcher state:", userFetcher.state);
+  console.log("conversationFetcher state:", conversationFetcher.state);
+  console.log("messagesFetcher state:", messagesFetcher.state);
+  console.log("sendMessageFetcher state:", sendMessageFetcher.state);
+  console.log("messageInput:", messageInput);
+  console.log("conversationId:", conversationId);
+  console.groupEnd();
+
   if (!isConnected) {
+    console.log("Not connected!");
     return (
       <div className="flex items-center justify-center h-full">
         <LoadingSpinner size="small" />
@@ -228,20 +224,11 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     );
   }
 
-  // Render empty state when no user selected
-  if (!selectedUserId) {
+  if (!selectedUserId || !conversationId) {
+    console.log("No selectedUser or no conversationId");
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
         <p>Select a user to start chatting</p>
-      </div>
-    );
-  }
-
-  // Show loading state while fetching user data
-  if (userFetcher.state === "loading") {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner size="small" />
       </div>
     );
   }
@@ -250,7 +237,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
   // Show error state if user data couldn't be loaded
   if (!selectedUser) {
-    console.log("Selected user:", userFetcher);
     return (
       <div className="flex items-center justify-center h-full text-red-500">
         <p>Could not load user information</p>
@@ -263,7 +249,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       <ChatHeader user={selectedUser} isConnected={isConnected} />
 
       <MessageList
-        messages={messages}
+        conversationId={conversationId}
         userId={user?.sub}
         messagesEndRef={messagesEndRef}
       />

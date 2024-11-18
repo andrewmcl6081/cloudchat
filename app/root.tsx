@@ -1,5 +1,6 @@
 import { Auth0Provider } from "@auth0/auth0-react";
 import { SocketProvider } from "./context/SocketContext";
+import { MessagesProvider } from "./context/MessagesContex";
 import type { LinksFunction, LoaderFunction } from "@remix-run/node";
 import {
   Links,
@@ -11,9 +12,7 @@ import {
 } from "@remix-run/react";
 import styles from "./tailwind.css?url";
 
-export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: styles },
-];
+export const links: LinksFunction = () => [{ rel: "stylesheet", href: styles }];
 export const loader: LoaderFunction = async () => {
   return {
     env: {
@@ -42,7 +41,9 @@ export default function App() {
           }}
         >
           <SocketProvider>
-            <Outlet />
+            <MessagesProvider>
+              <Outlet />
+            </MessagesProvider>
           </SocketProvider>
         </Auth0Provider>
         <ScrollRestoration />
