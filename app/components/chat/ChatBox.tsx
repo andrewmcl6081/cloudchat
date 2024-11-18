@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useFetcher } from "@remix-run/react";
 import { useAuth0 } from "@auth0/auth0-react";
-import type { SerializeFrom } from "@remix-run/node";
 import LoadingSpinner from "~/components/LoadingSpinner";
 import { UserLoaderData } from "~/routes/api.users.$userId";
 import { ChatHeader } from "./ChatHeader";
@@ -21,7 +20,6 @@ import { MessageInput } from "./MessageInput";
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
-  const userFetcher = useFetcher<UserLoaderData>();
   const conversationFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher<SendMessageResponse>();
@@ -73,18 +71,20 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       return;
     }
 
-    // Load user data and create conversation in parallel
-    userFetcher.load(`/api/users/${selectedUserId}`);
-    conversationFetcher.submit(
-      {
-        userId1: user.sub,
-        userId2: selectedUserId,
-      },
-      {
-        method: "post",
-        action: "/api/conversations/create",
-      },
-    );
+    // Load user data and create conversation
+    if (selectedUserId) {
+      console.log("EXECUTING");
+      conversationFetcher.submit(
+        {
+          userId1: user.sub,
+          userId2: selectedUserId,
+        },
+        {
+          method: "post",
+          action: "/api/conversations/create",
+        },
+      );
+    }
 
     // Cleanup function
     return () => {
@@ -207,7 +207,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   };
 
   console.group("Render:");
-  console.log("userFetcher state:", userFetcher.state);
   console.log("conversationFetcher state:", conversationFetcher.state);
   console.log("messagesFetcher state:", messagesFetcher.state);
   console.log("sendMessageFetcher state:", sendMessageFetcher.state);
@@ -233,20 +232,9 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     );
   }
 
-  const selectedUser = userFetcher.data?.user;
-
-  // Show error state if user data couldn't be loaded
-  if (!selectedUser) {
-    return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        <p>Could not load user information</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full bg-white">
-      <ChatHeader user={selectedUser} isConnected={isConnected} />
+      <ChatHeader selectedUserId={selectedUserId} isConnected={isConnected} />
 
       <MessageList
         conversationId={conversationId}

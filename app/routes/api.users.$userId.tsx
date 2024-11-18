@@ -7,8 +7,10 @@ export type UserLoaderData = {
 };
 
 // Resource Routes(GET requests using loaders)
-export const loader: LoaderFunction = async ({ params }) => {
+export const loader: LoaderFunction = async ({ params, request }) => {
   const auth0Id = params.userId;
+  console.log("Loader executed for auth0Id:", auth0Id);
+  console.log("Request URL:", request.url);
 
   if (!auth0Id) {
     throw json({ error: "Auth0 ID is required" }, { status: 400 });
