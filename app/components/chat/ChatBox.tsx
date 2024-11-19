@@ -206,15 +206,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     }
   };
 
-  console.group("Render:");
-  console.log("userFetcher state:", userFetcher.state);
-  console.log("conversationFetcher state:", conversationFetcher.state);
-  console.log("messagesFetcher state:", messagesFetcher.state);
-  console.log("sendMessageFetcher state:", sendMessageFetcher.state);
-  console.log("messageInput:", messageInput);
-  console.log("conversationId:", conversationId);
-  console.groupEnd();
-
   if (!isConnected) {
     console.log("Not connected!");
     return (
