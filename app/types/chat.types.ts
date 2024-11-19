@@ -1,11 +1,11 @@
-import type { MessageWithSender } from "~/types"
+import type { MessageWithSender } from "~/types";
 
 export interface ConversationResponse {
   conversationId: string;
 }
 
 export interface MessagesResponse {
-  messages: MessageWithSender[]
+  messages: MessageWithSender[];
 }
 
 export interface ChatBoxProps {
@@ -13,10 +13,6 @@ export interface ChatBoxProps {
 }
 
 export interface ChatHeaderProps {
-  user: {
-    displayName?: string | null;
-    email: string;
-    picture?: string | null;
-  };
+  selectedUserId: string | null;
   isConnected: boolean;
 }

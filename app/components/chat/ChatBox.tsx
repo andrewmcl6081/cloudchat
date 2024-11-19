@@ -2,16 +2,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useFetcher } from "@remix-run/react";
 import { useAuth0 } from "@auth0/auth0-react";
-import type { SerializeFrom } from "@remix-run/node";
 import LoadingSpinner from "~/components/LoadingSpinner";
-import { UserLoaderData } from "~/routes/api.users.$userId";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { useSocketContext } from "~/hooks/useSocketContext";
 import { useSocketEvent } from "~/hooks/useSocketEvent";
 import { useMessages } from "~/context/MessagesContex";
+import { useLoading } from "~/context/LoadingContext";
 import type {
-  MessageWithSender,
   SendMessageResponse,
   ConversationResponse,
   MessagesResponse,
@@ -21,7 +19,6 @@ import { MessageInput } from "./MessageInput";
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
-  const userFetcher = useFetcher<UserLoaderData>();
   const conversationFetcher = useFetcher<ConversationResponse>();
   const messagesFetcher = useFetcher<MessagesResponse>();
   const sendMessageFetcher = useFetcher<SendMessageResponse>();
@@ -30,6 +27,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // State management
   const [messageInput, setMessageInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Context
@@ -37,14 +35,10 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     useSocketContext();
   const { addMessage, setConversationMessages, clearConversation } =
     useMessages();
+  const { componentsAreLoading } = useLoading();
 
-  // useEffect(() => {
-  //   if (isConnected) {
-  //     console.log("Socket is connected. ID:", getSocketId());
-  //   } else {
-  //     console.log("Waiting for socket connection...");
-  //   }
-  // }, [isConnected, getSocketId]);
+  // Refs
+  const prevSelectedUserId = useRef<string | null>(null);
 
   // Socket event handlers
   useSocketEvent({
@@ -63,9 +57,25 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     },
   });
 
+  useEffect(() => {
+    if (prevSelectedUserId.current !== selectedUserId) {
+      // Reset loading state for new user
+      setInitialLoading(true);
+
+      // Simulate a delay to ensure spinner shows
+      const timer = setTimeout(() => {
+        setInitialLoading(false);
+      }, 1000);
+
+      // Update the previous User ID
+      prevSelectedUserId.current = selectedUserId;
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedUserId]);
+
   // handle initial chat setup
   useEffect(() => {
-    console.group("Chat Initialization Flow");
     // Exit and clean up if we dont have necessary data
     if (!selectedUserId || !user?.sub) {
       cleanup(conversationId);
@@ -73,8 +83,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       return;
     }
 
-    // Load user data and create conversation in parallel
-    userFetcher.load(`/api/users/${selectedUserId}`);
+    // Create conversation
     conversationFetcher.submit(
       {
         userId1: user.sub,
@@ -97,8 +106,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     //Check if we have conversation data from the API
     if (!conversationFetcher.data?.conversationId) return;
     const newConversationId = conversationFetcher.data.conversationId;
-
-    console.group("Conversation Setup Flow");
     console.log("Setting up conversation:", newConversationId);
 
     // Store conversation ID in state
@@ -206,17 +213,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     }
   };
 
-  if (!isConnected) {
-    console.log("Not connected!");
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner size="small" />
-      </div>
-    );
-  }
-
-  if (!selectedUserId || !conversationId) {
-    console.log("No selectedUser or no conversationId");
+  if (!selectedUserId) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
         <p>Select a user to start chatting</p>
@@ -224,27 +221,23 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     );
   }
 
-  const selectedUser = userFetcher.data?.user;
-
-  // Show error state if user data couldn't be loaded
-  if (!selectedUser) {
-    return (
-      <div className="flex items-center justify-center h-full text-red-500">
-        <p>Could not load user information</p>
-      </div>
-    );
-  }
+  const showSpinner = initialLoading || componentsAreLoading || !conversationId;
 
   return (
-    <div className="flex flex-col h-full bg-white">
-      <ChatHeader user={selectedUser} isConnected={isConnected} />
+    <div className="relative flex flex-col h-full bg-white">
+      {showSpinner && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-100">
+          <LoadingSpinner size="large" />
+        </div>
+      )}
+
+      <ChatHeader selectedUserId={selectedUserId} isConnected={true} />
 
       <MessageList
         conversationId={conversationId}
         userId={user?.sub}
         messagesEndRef={messagesEndRef}
       />
-
       <MessageInput
         value={messageInput}
         onChange={setMessageInput}

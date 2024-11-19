@@ -4,6 +4,7 @@ import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
 import UserList from "~/components/UserList";
 import ChatBox from "~/components/chat/ChatBox";
+import { LoadingProvider } from "~/context/LoadingContext";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0
@@ -75,7 +76,9 @@ export default function Dashboard() {
             onSelect={setSelectedUserId}
           />
           <main className="flex-1">
-            <ChatBox selectedUserId={selectedUserId} />
+            <LoadingProvider>
+              <ChatBox selectedUserId={selectedUserId} />
+            </LoadingProvider>
           </main>
         </div>
       </div>

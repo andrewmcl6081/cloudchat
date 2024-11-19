@@ -7,12 +7,12 @@ export const MessageList = memo(function MessageList({
   userId,
   messagesEndRef,
 }: {
-  conversationId: string;
+  conversationId: string | null;
   userId?: string;
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }) {
   const { getMessages } = useMessages();
-  const messages = getMessages(conversationId);
+  const messages = conversationId ? getMessages(conversationId) : [];
 
   console.log("Rendering MessageList with messages:", messages.length);
   // Memoize the message list items
