@@ -16,6 +16,7 @@ import type {
   ChatBoxProps,
 } from "~/types";
 import { MessageInput } from "./MessageInput";
+import ChatBoxSkeleton from "../ChatBoxSkeleton";
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
@@ -65,7 +66,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       // Simulate a delay to ensure spinner shows
       const timer = setTimeout(() => {
         setInitialLoading(false);
-      }, 1000);
+      }, 1500);
 
       // Update the previous User ID
       prevSelectedUserId.current = selectedUserId;
@@ -221,13 +222,14 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     );
   }
 
-  const showSpinner = initialLoading || componentsAreLoading || !conversationId;
+  const showSkeleton =
+    initialLoading || componentsAreLoading || !conversationId;
 
   return (
     <div className="relative flex flex-col h-full bg-white">
-      {showSpinner && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white bg-opacity-100">
-          <LoadingSpinner size="large" />
+      {showSkeleton && (
+        <div className="absolute inset-0 z-10 h-full bg-white bg-opacity-100">
+          <ChatBoxSkeleton />
         </div>
       )}
 
