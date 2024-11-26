@@ -97,14 +97,6 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
     onSelect(auth0Id);
   };
 
-  if (fetcher.state === "loading" && allUsers.length === 0) {
-    return (
-      <div className="w-64 border-r border-gray-200 h-[calc(100vh-4rem)] bg-white flex items-center justify-center">
-        <LoadingSpinner size="small" />
-      </div>
-    );
-  }
-
   return (
     <div className="w-64 border-r border-gray-200 h-[calc(100vh-4rem)] bg-white">
       {/* Search Section */}

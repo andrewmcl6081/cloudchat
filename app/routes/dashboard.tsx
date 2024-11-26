@@ -2,12 +2,15 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useState } from "react";
 import { useFetcher } from "@remix-run/react";
 import { RequireAuth } from "~/components/auth/RequireAuth";
+import { LoadingProvider } from "~/context/LoadingContext";
+import { useLogout } from "~/context/LogoutContext";
 import UserList from "~/components/UserList";
 import ChatBox from "~/components/chat/ChatBox";
 
 export default function Dashboard() {
   // Get user data and logout function from Auth0
-  const { user, logout } = useAuth0();
+  const { user } = useAuth0();
+  const { handleLogout } = useLogout();
   // Initialize fetcher for making POST requests without navigation
   const fetcher = useFetcher();
   // Add state for selected user ID
@@ -55,11 +58,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <span className="text-gray-700">{user?.email}</span>
                 <button
-                  onClick={() =>
-                    logout({
-                      logoutParams: { returnTo: window.location.origin },
-                    })
-                  }
+                  onClick={handleLogout}
                   className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
                 >
                   Logout
@@ -75,7 +74,9 @@ export default function Dashboard() {
             onSelect={setSelectedUserId}
           />
           <main className="flex-1">
-            <ChatBox selectedUserId={selectedUserId} />
+            <LoadingProvider>
+              <ChatBox selectedUserId={selectedUserId} />
+            </LoadingProvider>
           </main>
         </div>
       </div>

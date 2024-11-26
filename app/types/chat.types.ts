@@ -13,6 +13,6 @@ export interface ChatBoxProps {
 }
 
 export interface ChatHeaderProps {
-  selectedUserId: string;
+  selectedUserId: string | null;
   isConnected: boolean;
 }

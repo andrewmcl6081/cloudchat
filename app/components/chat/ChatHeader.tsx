@@ -1,37 +1,29 @@
 import React, { useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { User } from "lucide-react";
-import type { ChatHeaderProps } from "~/types";
+import { ChatHeaderProps } from "~/types";
 import type { UserLoaderData } from "~/routes/api.users.$userId";
-import LoadingSpinner from "../LoadingSpinner";
+import { useLoading } from "~/context/LoadingContext";
 
 export function ChatHeader({ selectedUserId, isConnected }: ChatHeaderProps) {
   const userFetcher = useFetcher<UserLoaderData>();
+  const { setLoading } = useLoading();
 
-  // Fetch user data when selectedUserId changes
   useEffect(() => {
-    if (selectedUserId) {
-      console.log("ChatHeader: Fetching user data for:", selectedUserId);
-      userFetcher.load(`/api/users/${selectedUserId}`);
+    if (!selectedUserId) return;
+
+    setLoading("ChatHeader", true);
+    userFetcher.load(`/api/users/${selectedUserId}`);
+  }, [selectedUserId, setLoading]);
+
+  useEffect(() => {
+    if (userFetcher.state === "idle") {
+      setLoading("ChatHeader", false); // Stop loading
     }
-  }, [selectedUserId]);
+  }, [userFetcher.state, setLoading]);
 
-  // Handle loading state
-  if (userFetcher.state === "loading") {
-    return (
-      <div className="flex items-center justify-center h-16">
-        <LoadingSpinner size="small" />
-      </div>
-    );
-  }
-
-  // Handle error state
   if (!userFetcher.data?.user) {
-    return (
-      <div className="flex items-center justify-center h-16 text-red-500">
-        <p>Failed to load user information</p>
-      </div>
-    );
+    return null;
   }
 
   const user = userFetcher.data.user;
@@ -59,7 +51,13 @@ export function ChatHeader({ selectedUserId, isConnected }: ChatHeaderProps) {
       </div>
       <div className="flex items-center space-x-2">
         <span
+<<<<<<< HEAD
           className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+=======
+          className={`w-2 h-2 rounded-full ${
+            isConnected ? "bg-green-500" : "bg-red-500"
+          }`}
+>>>>>>> 88da37c561a1fa06e8bee057e177841ea409e2a3
         />
         <span className="text-sm text-gray-500">
           {isConnected ? "Connected" : "Disconnected"}
