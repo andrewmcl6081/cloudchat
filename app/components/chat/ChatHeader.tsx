@@ -51,13 +51,9 @@ export function ChatHeader({ selectedUserId, isConnected }: ChatHeaderProps) {
       </div>
       <div className="flex items-center space-x-2">
         <span
-<<<<<<< HEAD
-          className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
-=======
           className={`w-2 h-2 rounded-full ${
             isConnected ? "bg-green-500" : "bg-red-500"
           }`}
->>>>>>> 88da37c561a1fa06e8bee057e177841ea409e2a3
         />
         <span className="text-sm text-gray-500">
           {isConnected ? "Connected" : "Disconnected"}

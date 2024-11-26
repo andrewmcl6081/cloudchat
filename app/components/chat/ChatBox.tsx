@@ -108,22 +108,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       return;
     }
 
-<<<<<<< HEAD
-    // Load user data and create conversation
-    if (selectedUserId) {
-      console.log("EXECUTING");
-      conversationFetcher.submit(
-        {
-          userId1: user.sub,
-          userId2: selectedUserId,
-        },
-        {
-          method: "post",
-          action: "/api/conversations/create",
-        },
-      );
-    }
-=======
     // Create conversation
     conversationFetcher.submit(
       {
@@ -135,7 +119,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         action: "/api/conversations/create",
       },
     );
->>>>>>> 88da37c561a1fa06e8bee057e177841ea409e2a3
 
     // Cleanup function
     return () => {
@@ -223,40 +206,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     }, 0);
   };
 
-<<<<<<< HEAD
-  // Handle cleanup when user changes or logs out
-  const cleanup = (currentConversationId: string | null) => {
-    if (currentConversationId) {
-      console.log("Cleaning up conversation:", currentConversationId);
-      leaveConversation(currentConversationId);
-      clearConversation(currentConversationId);
-      setConversationId(null);
-      setMessageInput("");
-    }
-  };
-
-  console.group("Render:");
-  console.log("conversationFetcher state:", conversationFetcher.state);
-  console.log("messagesFetcher state:", messagesFetcher.state);
-  console.log("sendMessageFetcher state:", sendMessageFetcher.state);
-  console.log("messageInput:", messageInput);
-  console.log("conversationId:", conversationId);
-  console.groupEnd();
-
-  if (!isConnected) {
-    console.log("Not connected!");
-    return (
-      <div className="flex items-center justify-center h-full">
-        <LoadingSpinner size="small" />
-      </div>
-    );
-  }
-
-  if (!selectedUserId || !conversationId) {
-    console.log("No selectedUser or no conversationId");
-=======
   if (!selectedUserId) {
->>>>>>> 88da37c561a1fa06e8bee057e177841ea409e2a3
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
         <p>Select a user to start chatting</p>
@@ -264,11 +214,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     );
   }
 
-<<<<<<< HEAD
-  return (
-    <div className="flex flex-col h-full bg-white">
-      <ChatHeader selectedUserId={selectedUserId} isConnected={isConnected} />
-=======
   const showSkeleton =
     initialLoading || componentsAreLoading || !conversationId;
 
@@ -281,7 +226,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       )}
 
       <ChatHeader selectedUserId={selectedUserId} isConnected={true} />
->>>>>>> 88da37c561a1fa06e8bee057e177841ea409e2a3
 
       <MessageList
         conversationId={conversationId}
