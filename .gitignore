@@ -3,6 +3,6 @@ node_modules
 /public/build
 /.cache
 /build
-.env
+.env*
 
 /cloudchat-local-dev-key.json

@@ -2,6 +2,7 @@ import { Auth0Provider } from "@auth0/auth0-react";
 import { SocketProvider } from "./context/SocketContext";
 import { MessagesProvider } from "./context/MessagesContex";
 import { LogoutProvider } from "./context/LogoutContext";
+import { environmentConfig } from "./services/config/environment.server";
 import type { LinksFunction, LoaderFunction } from "@remix-run/node";
 import {
   Links,
@@ -15,11 +16,13 @@ import styles from "./tailwind.css?url";
 
 export const links: LinksFunction = () => [{ rel: "stylesheet", href: styles }];
 export const loader: LoaderFunction = async () => {
+  const config = await environmentConfig.getConfig();
+
   return {
     env: {
-      AUTH0_DOMAIN: process.env.AUTH0_DOMAIN,
-      AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
-      AUTH0_CALLBACK_URL: process.env.AUTH0_CALLBACK_URL,
+      AUTH0_DOMAIN: config.AUTH0_DOMAIN,
+      AUTH0_CLIENT_ID: config.AUTH0_CLIENT_ID,
+      AUTH0_CALLBACK_URL: config.AUTH0_CALLBACK_URL,
     },
   };
 };
