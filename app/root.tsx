@@ -1,6 +1,7 @@
 import { Auth0Provider } from "@auth0/auth0-react";
 import { SocketProvider } from "./context/SocketContext";
 import { MessagesProvider } from "./context/MessagesContex";
+import { LogoutProvider } from "./context/LogoutContext";
 import type { LinksFunction, LoaderFunction } from "@remix-run/node";
 import {
   Links,
@@ -40,11 +41,13 @@ export default function App() {
             redirect_uri: data.env.AUTH0_CALLBACK_URL,
           }}
         >
-          <SocketProvider>
-            <MessagesProvider>
-              <Outlet />
-            </MessagesProvider>
-          </SocketProvider>
+          <LogoutProvider>
+            <SocketProvider>
+              <MessagesProvider>
+                <Outlet />
+              </MessagesProvider>
+            </SocketProvider>
+          </LogoutProvider>
         </Auth0Provider>
         <ScrollRestoration />
         <Scripts />

@@ -1,22 +1,22 @@
 // app/components/ChatBox.tsx
-import React, { useEffect, useState, useRef } from "react";
-import { useFetcher } from "@remix-run/react";
-import { useAuth0 } from "@auth0/auth0-react";
-import LoadingSpinner from "~/components/LoadingSpinner";
-import { ChatHeader } from "./ChatHeader";
-import { MessageList } from "./MessageList";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useSocketContext } from "~/hooks/useSocketContext";
 import { useSocketEvent } from "~/hooks/useSocketEvent";
+import { MessageInput } from "./MessageInput";
+import { MessageList } from "./MessageList";
 import { useMessages } from "~/context/MessagesContex";
+import { ChatHeader } from "./ChatHeader";
 import { useLoading } from "~/context/LoadingContext";
+import { useFetcher } from "@remix-run/react";
+import { useLogout } from "~/context/LogoutContext";
+import { useAuth0 } from "@auth0/auth0-react";
+import ChatBoxSkeleton from "./ChatBoxSkeleton";
 import type {
   SendMessageResponse,
   ConversationResponse,
   MessagesResponse,
   ChatBoxProps,
 } from "~/types";
-import { MessageInput } from "./MessageInput";
-import ChatBoxSkeleton from "../ChatBoxSkeleton";
 
 export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   // Fetchers
@@ -37,6 +37,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
   const { addMessage, setConversationMessages, clearConversation } =
     useMessages();
   const { componentsAreLoading } = useLoading();
+  const { addLogoutHandler, removeLogoutHandler } = useLogout();
 
   // Refs
   const prevSelectedUserId = useRef<string | null>(null);
@@ -58,6 +59,19 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     },
   });
 
+  const cleanup = useCallback(
+    (currentConversationId: string | null) => {
+      if (currentConversationId) {
+        console.log("Cleaning up conversation:", currentConversationId);
+        leaveConversation(currentConversationId);
+        clearConversation(currentConversationId);
+        setConversationId(null);
+        setMessageInput("");
+      }
+    },
+    [leaveConversation, clearConversation],
+  );
+
   useEffect(() => {
     if (prevSelectedUserId.current !== selectedUserId) {
       // Reset loading state for new user
@@ -66,7 +80,7 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
       // Simulate a delay to ensure spinner shows
       const timer = setTimeout(() => {
         setInitialLoading(false);
-      }, 1500);
+      }, 1250);
 
       // Update the previous User ID
       prevSelectedUserId.current = selectedUserId;
@@ -75,12 +89,22 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     }
   }, [selectedUserId]);
 
+  useEffect(() => {
+    // Create handler that uses cleanup
+    const handleLogout = () => cleanup(conversationId);
+
+    // Register the logout handler
+    addLogoutHandler(handleLogout);
+
+    // Cleanup on unmount
+    return () => removeLogoutHandler(handleLogout);
+  }, [conversationId, addLogoutHandler, removeLogoutHandler, cleanup]);
+
   // handle initial chat setup
   useEffect(() => {
     // Exit and clean up if we dont have necessary data
     if (!selectedUserId || !user?.sub) {
       cleanup(conversationId);
-      console.groupEnd();
       return;
     }
 
@@ -99,7 +123,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
     // Cleanup function
     return () => {
       cleanup(conversationId);
-      console.groupEnd();
     };
   }, [selectedUserId, user?.sub]); // Runs when selected user changes or current user changes
 
@@ -120,7 +143,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     // Logging
     console.log("Requested messages for conversation:", newConversationId);
-    console.groupEnd();
   }, [conversationFetcher.data]);
 
   useEffect(() => {
@@ -136,25 +158,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
 
     console.groupEnd();
   }, [messagesFetcher.data]);
-
-  // Handle user logout
-  useEffect(() => {
-    const handleLogout = () => {
-      if (conversationId) {
-        console.log("Logging out, leaving conversation:", conversationId);
-        leaveConversation(conversationId);
-        clearConversation(conversationId);
-        setConversationId(null);
-      }
-    };
-
-    // Listen for Auth0's logout event
-    window.addEventListener("auth0:logout", handleLogout);
-
-    return () => {
-      window.removeEventListener("auth0:logout", handleLogout);
-    };
-  }, [conversationId]);
 
   useEffect(() => {
     // Access serializedMessage only if it exists in sendMessageFetcher.data
@@ -201,17 +204,6 @@ export default function ChatBox({ selectedUserId }: ChatBoxProps) {
         behavior: smooth ? "smooth" : "auto",
       });
     }, 0);
-  };
-
-  // Handle cleanup when user changes or logs out
-  const cleanup = (currentConversationId: string | null) => {
-    if (currentConversationId) {
-      console.log("Cleaning up conversation:", currentConversationId);
-      leaveConversation(currentConversationId);
-      clearConversation(currentConversationId);
-      setConversationId(null);
-      setMessageInput("");
-    }
   };
 
   if (!selectedUserId) {
