@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import LoadingSpinner from "~/components/LoadingSpinner";
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
   const navigate = useNavigate();
 
   // Handle navigation in useEffect, not during render
@@ -21,18 +21,16 @@ export default function Index() {
   return (
     <div className="flex h-screen items-center justify-center bg-gray-50">
       <div className="text-center">
-        <h1 className="mb-8 text-4xl font-bold text-gray-900">
-          Welcome to CloudChat
-        </h1>
+        <h1 className="mb-8 text-4xl font-bold text-gray-900">CloudChat</h1>
         <p className="mb-8 text-lg text-gray-600">
           A simple and secure way to chat with your team
         </p>
-        <Link
-          to="/login"
+        <button
+          onClick={() => loginWithRedirect()}
           className="rounded-md bg-blue-600 px-6 py-3 text-white hover:bg-blue-700"
         >
-          Get Started
-        </Link>
+          Sign in with Auth0
+        </button>
       </div>
     </div>
   );
