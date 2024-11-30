@@ -11,10 +11,6 @@ RUN npm install
 # Copy Prisma schema and generate client
 COPY prisma ./prisma/
 
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
-RUN npx prisma generate
-
 # Copy app files
 COPY . .
 
