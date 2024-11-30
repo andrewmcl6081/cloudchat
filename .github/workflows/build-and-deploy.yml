@@ -63,7 +63,7 @@ jobs:
           echo "Fetching database credentials from Secrets Manager..."
           DB_SECRET=$(aws secretsmanager get-secret-value --secret-id prod/cloudchat/db --query 'SecretString' --output text)
           DATABASE_URL=$(echo $DB_SECRET | jq -r '.DATABASE_URL')
-
+          echo "Using Docker image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
           # Stop and remove existing container if it exists
           docker rm -f cloudchat || true
 
