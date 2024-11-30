@@ -29,7 +29,6 @@ export default function UserList({ selectedUserId, onSelect }: UserListProps) {
       setOnlineUsers(userSet);
     },
     onUserStatus: (data) => {
-      console.log("User status changed:", data);
       setOnlineUsers((prev) => {
         const newSet = new Set(prev);
         if (data.status === "online") {
