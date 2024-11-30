@@ -2,10 +2,13 @@ import { Server } from "socket.io";
 import { SerializeFrom } from "@remix-run/node";
 import type { Server as HTTPServer } from "http";
 import type { Socket } from "socket.io";
+import { RedisSocketAdapter } from "../redis/redis.socket.adaptor";
+import { configService } from "../config/environment.server";
 import type {
   ServerToClientEvents,
   ClientToServerEvents,
   MessageWithSender,
+  OnlineUserData,
 } from "~/types";
 
 declare global {
@@ -15,13 +18,14 @@ declare global {
     | undefined;
   // eslint-disable-next-line no-var
   var __socketServer: SocketServer | undefined;
+  // eslint-disable-next-line no-var
+  var __redisAdapter: RedisSocketAdapter | undefined;
 }
 
 export class SocketServer {
   private debugMode: boolean = true;
   private initialized: boolean = false;
-  private socketRooms: Map<string, Set<string>> = new Map(); // socketId -> Set of roomIds
-  private onlineUsers: Map<string, { socketId: string }> = new Map(); // Track online users by map of userId to socketId
+  private redisAdapter: RedisSocketAdapter | null = null;
 
   private constructor() {}
 
@@ -37,51 +41,6 @@ export class SocketServer {
     }
   }
 
-  private addSocketToRoom(socketId: string, roomId: string) {
-    // Track socket's rooms
-    if (!this.socketRooms.has(socketId)) {
-      this.socketRooms.set(socketId, new Set());
-    }
-    this.socketRooms.get(socketId)?.add(roomId);
-  }
-
-  private removeSocketFromRoom(socketId: string, roomId: string) {
-    // Remove from socket's rooms
-    const rooms = this.socketRooms.get(socketId);
-    if (rooms) {
-      this.log(
-        "room",
-        `Before removal - Socket ${socketId} rooms:`,
-        Array.from(rooms),
-      );
-      rooms.delete(roomId);
-      this.log(
-        "room",
-        `After removal - Socket ${socketId} rooms:`,
-        Array.from(rooms),
-      );
-      if (rooms.size === 0) {
-        this.socketRooms.delete(socketId);
-        this.log("room", `Removed empty room set for socket ${socketId}`);
-      }
-    }
-  }
-
-  private getSocketRooms(socketId: string): string[] {
-    const rooms = this.socketRooms.get(socketId);
-    const socketIORooms =
-      global.__socketIO?.sockets.sockets.get(socketId)?.rooms;
-    this.log("room", `Room state for ${socketId}:`, {
-      tracked: Array.from(rooms || []),
-      socketIO: Array.from(socketIORooms || []),
-    });
-    return Array.from(rooms || []);
-  }
-
-  private getSocketRoomSize(roomId: string): number {
-    return global.__socketIO?.sockets.adapter.rooms.get(roomId)?.size || 0;
-  }
-
   // Get or create the singleton instance
   public static getInstance(): SocketServer {
     if (!global.__socketServer) {
@@ -90,29 +49,37 @@ export class SocketServer {
     return global.__socketServer;
   }
 
-  public initialize(httpServer: HTTPServer) {
+  public async initialize(httpServer: HTTPServer) {
     if (this.initialized) {
       this.log("connection", "SocketServer already initialized, skipping...");
       return global.__socketIO!;
     }
 
+    const env = await configService.getConfig();
     this.log("connection", "Initializing SocketServer...");
-
+    console.log("ENV.DOMAIN:", env.DOMAIN);
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
         cors: {
-          origin:
-            process.env.NODE_ENV === "production"
-              ? process.env.PRODUCTION_URL
-              : "http://localhost:5173",
+          origin: env.DOMAIN,
           methods: ["GET", "POST"],
           credentials: true,
         },
-        pingInterval: 25000, // How often to ping clients
-        pingTimeout: 20000, // How long to wait for pong
-        connectTimeout: 20000, // Connection timeout
+        pingInterval: 25000,
+        pingTimeout: 20000,
+        connectTimeout: 20000,
         transports: ["websocket", "polling"],
       });
+
+      this.redisAdapter = new RedisSocketAdapter(global.__socketIO);
+      try {
+        await this.redisAdapter.connect();
+        global.__redisAdapter = this.redisAdapter;
+        this.log("connection", "Redis Adapter connected successfully");
+      } catch (error) {
+        this.log("error", "Failed to initialize Redis Adapter:", error);
+        throw error;
+      }
 
       this.setupEventHandlers();
       this.initialized = true;
@@ -161,15 +128,14 @@ export class SocketServer {
         return;
       }
 
-      this.handleUserConnection(socket, userId);
+      this.setupUserConnection(socket, userId);
       this.setupMessageHandlers(socket, userId);
       this.setupRoomHandlers(socket, userId);
       this.setupDisconnectHandlers(socket, userId);
     });
   }
 
-  // Connection handling
-  private handleUserConnection(
+  private setupUserConnection(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
     userId: string,
   ) {
@@ -178,232 +144,185 @@ export class SocketServer {
       `User ${userId} connected with socket ${socket?.id}`,
     );
 
-    this.onlineUsers.set(userId, { socketId: socket.id });
-    this.log(
-      "status",
-      "Updated onlineUsers map after connection:",
-      Array.from(this.onlineUsers.entries()),
-    );
+    if (this.redisAdapter) {
+      this.redisAdapter
+        .setUserPresence(userId, socket.id)
+        .then((success) => {
+          if (success) {
+            // Notify other servers and the server's clients
+            //this.redisAdapter?.publishUserStatus(userId, "online");
 
-    // Broadcast user's online status
-    socket.broadcast.emit("user-status-change", {
-      userId,
-      status: "online",
+            // Notify clients and other servers
+            socket.broadcast.emit("user-status-change", {
+              userId,
+              status: "online",
+            });
+          }
+        })
+        .catch((error) => this.log("error", "Failed to set presence:", error));
+    }
+
+    socket.on("get-online-users", async () => {
+      try {
+        if (this.redisAdapter) {
+          const onlineUsers = await this.redisAdapter.getOnlineUsers();
+          const filteredUsers = onlineUsers.filter(
+            (user) => user.userId !== userId,
+          );
+
+          socket.emit("initial-online-users", filteredUsers);
+          this.log("status", "Sent online users list:", filteredUsers);
+        }
+      } catch (error) {
+        this.log("error", "Error getting online users:", error);
+      }
     });
-    this.log("status", `Emitted user-status-change for ${userId} as online`);
-
-    // Set up initial online users request handler
-    socket.on("get-online-users", () => this.handleGetOnlineUsers(socket));
-  }
-
-  private handleGetOnlineUsers(
-    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
-  ) {
-    this.log("status", "Client requested online users list");
-
-    const onlineUsersList = Array.from(this.onlineUsers.entries())
-      .filter(([userId, _]) => userId !== socket.handshake.auth?.userId) // Filter out self
-      .map(([userId, value]) => ({
-        userId,
-        socketId: value.socketId,
-      }));
-
-    this.log("status", "Sending online users list:", onlineUsersList);
-    socket.emit("initial-online-users", onlineUsersList);
   }
 
   private setupMessageHandlers(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
     userId: string,
   ) {
-    socket.on("send-message", (data: any) =>
-      this.handleSendMessage(socket, data),
-    );
-  }
+    socket.on("send-message", async (data: any) => {
+      try {
+        // Check if socket is in the room using Socket.IO's built in rooms
+        if (!socket.rooms.has(data.conversationId)) {
+          this.log(
+            "error",
+            `Message not broadcast - socket not in room ${data.conversationId}`,
+          );
+          return;
+        }
 
-  private handleSendMessage(
-    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
-    data: any,
-  ) {
-    try {
-      // Verify sender is in the conversation
-      if (!this.getSocketRooms(socket.id).includes(data.conversationId)) {
+        const messageData = this.createMessageData(data);
+        socket.to(data.conversationId).emit("new-message", messageData);
         this.log(
-          "error",
-          `Message not broadcast - socket not in room ${data.conversationId}`,
+          "message",
+          `Message sent in conversation ${data.conversationId}`,
+          {
+            socketId: socket.id,
+            roomSize:
+              global.__socketIO?.sockets.adapter.rooms.get(data.conversationId)
+                ?.size || 0,
+          },
         );
-        return;
+      } catch (error) {
+        this.log("error", "Error handling send-message:", error);
       }
-
-      const messageData = this.createMessageData(data);
-      socket.to(data.conversationId).emit("new-message", messageData);
-
-      this.log(
-        "message",
-        `Message sent in conversation ${data.conversationId}`,
-        {
-          socketId: socket.id,
-          roomSize: this.getSocketRoomSize(data.conversationId),
-        },
-      );
-    } catch (error) {
-      this.log("error", "Error handling send-message:", error);
-    }
+    });
   }
 
-  // Room handling
   private setupRoomHandlers(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
     userId: string,
   ) {
-    socket.on("join-conversation", (conversationId: string) =>
-      this.handleJoinConversation(socket, conversationId),
-    );
+    socket.on("join-conversation", async (conversationId: string) => {
+      try {
+        // Join the room - Redis Adapter handles the rest
+        await socket.join(conversationId);
+        this.log("room", `Socket ${socket.id} joined room ${conversationId}`);
 
-    socket.on("leave-conversation", (conversationId: string) =>
-      this.handleLeaveConversation(socket, conversationId),
-    );
-  }
-
-  private async handleJoinConversation(
-    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
-    conversationId: string,
-  ) {
-    try {
-      const room = await global.__socketIO?.in(conversationId).allSockets();
-      const isInRoom = room?.has(socket.id) || false;
-
-      if (isInRoom) {
+        // Notify others in the room
+        socket.to(conversationId).emit("user-joined", {
+          conversationId,
+          userId,
+        });
+      } catch (error) {
         this.log(
-          "room",
-          `Socket ${socket.id} already in room ${conversationId}`,
+          "error",
+          `Error joining conversation ${conversationId}:`,
+          error,
         );
-        this.addSocketToRoom(socket.id, conversationId);
-        return;
       }
+    });
 
-      // Leave current rooms
-      await this.leaveCurrentRooms(socket);
-      this.log(
-        "room",
-        `Current rooms for socket ${socket.id} before joining:`,
-        Array.from(this.socketRooms.get(socket.id) || []),
-      );
+    socket.on("leave-conversation", async (conversationId: string) => {
+      try {
+        // Notify before leaving
+        socket.to(conversationId).emit("user-left", {
+          conversationId,
+          userId,
+          reason: "left",
+        });
 
-      // Join new room
-      await socket.join(conversationId);
-      this.addSocketToRoom(socket.id, conversationId);
-      this.log(
-        "room",
-        `Current rooms for socket ${socket.id} after joining:`,
-        Array.from(this.socketRooms.get(socket.id) || []),
-      );
-
-      // Notify others
-      socket.to(conversationId).emit("user-joined", {
-        conversationId,
-        userId: socket.id,
-      });
-      this.log("room", `Socket ${socket.id} joined room ${conversationId}`);
-    } catch (error) {
-      this.log("error", "Error in join-conversation:", error);
-    }
-  }
-
-  private async leaveCurrentRooms(
-    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
-  ) {
-    const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
-    for (const roomId of currentRooms) {
-      await socket.leave(roomId);
-      this.removeSocketFromRoom(socket.id, roomId);
-    }
-  }
-
-  private handleLeaveConversation(
-    socket: Socket<ClientToServerEvents, ServerToClientEvents>,
-    conversationId: string,
-  ) {
-    try {
-      const currentRooms = Array.from(this.socketRooms.get(socket.id) || []);
-
-      if (!currentRooms.includes(conversationId)) {
-        this.log("room", `Socket ${socket.id} not in room ${conversationId}`);
-        return;
+        // Simply leave the room
+        await socket.leave(conversationId);
+        this.log("room", `Socket ${socket.id} left room ${conversationId}`);
+      } catch (error) {
+        this.log(
+          "error",
+          `Error leaving conversation ${conversationId}:`,
+          error,
+        );
       }
-
-      // Notify and leave
-      socket.to(conversationId).emit("user-left", {
-        conversationId,
-        userId: socket.id,
-        reason: "left",
-      });
-
-      socket.leave(conversationId);
-      this.removeSocketFromRoom(socket.id, conversationId);
-      this.log("room", `Socket ${socket.id} left room ${conversationId}`);
-    } catch (error) {
-      this.log("error", "Error in leave-conversation:", error);
-    }
+    });
   }
 
   private setupDisconnectHandlers(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
     userId: string,
   ) {
-    socket.on("disconnecting", () => this.handleDisconnecting(socket));
+    socket.on("disconnecting", () => this.handleDisconnecting(socket, userId));
     socket.on("disconnect", () => this.handleDisconnect(socket, userId));
   }
 
   private handleDisconnecting(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+    userId: string,
   ) {
-    const rooms = this.getSocketRooms(socket.id);
+    // Get all rooms except the socket's own room
+    const rooms = Array.from(socket.rooms).filter((room) => room !== socket.id);
     this.log(
       "connection",
       `Socket ${socket.id} disconnecting from rooms:`,
       rooms,
     );
 
+    // Notify all rooms except the socket's own room
     rooms.forEach((roomId) => {
       socket.to(roomId).emit("user-left", {
         conversationId: roomId,
-        userId: socket.id,
+        userId: userId,
         reason: "disconnected",
       });
-      this.removeSocketFromRoom(socket.id, roomId);
     });
   }
 
-  private handleDisconnect(
+  private async handleDisconnect(
     socket: Socket<ClientToServerEvents, ServerToClientEvents>,
     userId: string,
   ) {
-    const rooms = this.getSocketRooms(socket.id);
+    try {
+      if (userId) {
+        // Remove Redis presence first
+        if (this.redisAdapter) {
+          await this.redisAdapter.removeUserPresence(userId);
+          //await this.redisAdapter.publishUserStatus(userId, "offline");
+        }
 
-    if (userId) {
-      this.onlineUsers.delete(userId);
+        // Broadcast offline status
+        socket.broadcast.emit("user-status-change", {
+          userId,
+          status: "offline",
+        });
+        this.log(
+          "status",
+          `Emitted user-status-change for ${userId} as offline`,
+        );
+      }
+
+      // No need to clean up rooms - Redis adapter handles this automatically
+      this.log("connection", `Socket ${socket.id} disconnected`);
+    } catch (error) {
       this.log(
-        "status",
-        "Updating onlineUsers map after disconnection:",
-        Array.from(this.onlineUsers.entries()),
+        "error",
+        `Error in disconnect handler for user ${userId}:`,
+        error,
       );
-
-      socket.broadcast.emit("user-status-change", {
-        userId,
-        status: "offline",
-      });
-      this.log("status", `Emitted user-status-change for ${userId} as offline`);
     }
-
-    // Remove socket from all rooms it was part of
-    rooms.forEach((roomId) => {
-      this.removeSocketFromRoom(socket.id, roomId);
-    });
-    this.log("connection", "Client Disconnected:", socket.id);
   }
 
-  public emit(
+  public async emit(
     event: keyof ServerToClientEvents,
     room: string,
     data: SerializeFrom<MessageWithSender>,
@@ -415,20 +334,40 @@ export class SocketServer {
 
     try {
       global.__socketIO.to(room).emit(event, data);
+      const roomSize =
+        global.__socketIO.sockets.adapter.rooms.get(room)?.size || 0;
       this.log("connection", `Event ${event} emitted to room ${room}`, {
-        roomSize: this.getSocketRoomSize(room),
+        roomSize,
       });
     } catch (error) {
       this.log("error", `Error emitting event ${event}:`, error);
     }
   }
 
-  public getOnlineUserCount(): number {
-    return this.onlineUsers.size;
+  public async getOnlineUserCount(): Promise<number> {
+    if (!this.redisAdapter) return 0;
+
+    try {
+      const onlineUsers = await this.redisAdapter.getOnlineUsers();
+      return onlineUsers.length;
+    } catch (error) {
+      this.log("error", "Error getting online user count:", error);
+      return 0;
+    }
   }
 
-  public isUserOnline(userId: string): boolean {
-    return this.onlineUsers.has(userId);
+  public async isUserOnline(userId: string): Promise<boolean> {
+    if (!this.redisAdapter) return false;
+
+    try {
+      const exists = await this.redisAdapter
+        .getRedisClient()
+        ?.exists(`presence:${userId}`);
+      return exists === 1;
+    } catch (error) {
+      this.log("error", `Error checking if user ${userId} is online:`, error);
+      return false;
+    }
   }
 
   // Get the Socket.IO server instance
