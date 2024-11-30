@@ -2,7 +2,7 @@ import { Auth0Provider } from "@auth0/auth0-react";
 import { SocketProvider } from "./context/SocketContext";
 import { MessagesProvider } from "./context/MessagesContex";
 import { LogoutProvider } from "./context/LogoutContext";
-import { environmentConfig } from "./services/config/environment.server";
+import { configService } from "./services/config/environment.server";
 import type { LinksFunction, LoaderFunction } from "@remix-run/node";
 import {
   Links,
@@ -16,7 +16,7 @@ import styles from "./tailwind.css?url";
 
 export const links: LinksFunction = () => [{ rel: "stylesheet", href: styles }];
 export const loader: LoaderFunction = async () => {
-  const config = await environmentConfig.getConfig();
+  const config = await configService.getConfig();
 
   return {
     env: {
