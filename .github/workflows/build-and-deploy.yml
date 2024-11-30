@@ -57,26 +57,26 @@ jobs:
           # Login to ECR
           sudo -u ec2-user bash << 'EOC'
           newgrp docker
-          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 891377287589.dkr.ecr.us-east-1.amazonaws.com
 
           # Get database credentials from Secrets Manager
           echo "Fetching database credentials from Secrets Manager..."
           DB_SECRET=$(aws secretsmanager get-secret-value --secret-id prod/cloudchat/db --query 'SecretString' --output text)
           DATABASE_URL=$(echo $DB_SECRET | jq -r '.DATABASE_URL')
-          echo "Using Docker image: ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+          echo "Using Docker image: 891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest"
           # Stop and remove existing container if it exists
           docker rm -f cloudchat || true
 
           # Pull and run the container
           echo "Starting application container..."
-          docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+          docker pull 891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest
           docker run -d \
             --name cloudchat \
             -p 3000:3000 \
             -e DATABASE_URL="$DATABASE_URL" \
             -e NODE_ENV=production \
             --restart unless-stopped \
-            ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+            891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest
           EOC
           EOF
           )
