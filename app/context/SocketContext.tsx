@@ -4,7 +4,9 @@ import type { SocketContextType } from "~/types";
 import { socketService } from "~/services/socket/socket.client";
 
 // Create a context to provide socket functionality throughout the app
-export const SocketContext = createContext<SocketContextType | undefined>(undefined);
+export const SocketContext = createContext<SocketContextType | undefined>(
+  undefined,
+);
 
 // When using Server-Side Rendering (SSR), React code runs On the server, where sockets can't exist
 // so we need default values because during SSR, we can't have real socket connections and
@@ -31,13 +33,14 @@ const defaultContextValue: SocketContextType = {
 
 // Provider component that wraps part of the app that needs socket access
 export function SocketProvider({ children }: { children: ReactNode }) {
-  const [contextValue, setContextValue] = useState<SocketContextType>(defaultContextValue);
+  const [contextValue, setContextValue] =
+    useState<SocketContextType>(defaultContextValue);
   const { isAuthenticated, isLoading, user } = useAuth0();
 
   useEffect(() => {
     // Skip socket initialization if:
     // Running on server, user is not authenticated, or auth state is still loading
-    if (typeof window === 'undefined' || !isAuthenticated || isLoading) {
+    if (typeof window === "undefined" || !isAuthenticated || isLoading) {
       return;
     }
 
@@ -54,16 +57,26 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         joinConversation: socketService.joinConversation.bind(socketService),
         leaveConversation: socketService.leaveConversation.bind(socketService),
         sendMessage: socketService.sendMessage.bind(socketService),
-        addNewMessageListener: socketService.addNewMessageListener.bind(socketService),
-        removeNewMessageListener: socketService.removeNewMessageListener.bind(socketService),
-        addUserJoinedListener: socketService.addUserJoinedListener.bind(socketService),
-        removeUserJoinedListener: socketService.removeUserJoinedListener.bind(socketService),
-        addUserLeftListener: socketService.addUserLeftListener.bind(socketService),
-        removeUserLeftListener: socketService.removeUserLeftListener.bind(socketService),
-        addUserStatusListener: socketService.addUserStatusListener.bind(socketService),
-        removeUserStatusListener: socketService.removeUserStatusListener.bind(socketService),
-        addInitialOnlineUsersListener: socketService.addInitialOnlineUsersListener.bind(socketService),
-        removeInitialOnlineUsersListener: socketService.removeInitialOnlineUsersListener.bind(socketService),
+        addNewMessageListener:
+          socketService.addNewMessageListener.bind(socketService),
+        removeNewMessageListener:
+          socketService.removeNewMessageListener.bind(socketService),
+        addUserJoinedListener:
+          socketService.addUserJoinedListener.bind(socketService),
+        removeUserJoinedListener:
+          socketService.removeUserJoinedListener.bind(socketService),
+        addUserLeftListener:
+          socketService.addUserLeftListener.bind(socketService),
+        removeUserLeftListener:
+          socketService.removeUserLeftListener.bind(socketService),
+        addUserStatusListener:
+          socketService.addUserStatusListener.bind(socketService),
+        removeUserStatusListener:
+          socketService.removeUserStatusListener.bind(socketService),
+        addInitialOnlineUsersListener:
+          socketService.addInitialOnlineUsersListener.bind(socketService),
+        removeInitialOnlineUsersListener:
+          socketService.removeInitialOnlineUsersListener.bind(socketService),
         getSocketId: socketService.getSocketId.bind(socketService),
       };
 
@@ -79,10 +92,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
       // Update context value when socket disconnects
       socketInstance.on("disconnect", () => {
-        setContextValue(prev => ({
+        setContextValue((prev) => ({
           ...prev,
           isConnected: false,
         }));
+      });
+
+      socketInstance.on("system:status", (data) => {
+        console.log("System status:", data);
+        // You might want to show a notification or update UI state
+        if (data.type === "redis" && data.status === "disconnected") {
+          // Handle Redis disconnection, e.g., show a notification
+          // You could use a toast notification library or update some UI state
+          console.warn("Redis connection lost:", data.message);
+        }
       });
 
       // If socket is already connected when setting up listeners,
