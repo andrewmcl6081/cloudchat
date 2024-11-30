@@ -5,15 +5,15 @@ import express from "express";
 import morgan from "morgan";
 import { socketServer } from "../services/socket/socket.server";
 import { ServerBuild } from "@remix-run/node";
-import { environmentConfig } from "~/services/config/environment.server";
+import { configService } from "~/services/config/environment.server";
 import path from "path";
-
-const isProduction = process.env.NODE_ENV === "production";
 
 async function initializeApplication() {
   const app = express();
   const httpServer = createServer(app);
-  const config = await environmentConfig.getConfig();
+  const config = await configService.getConfig();
+  const isProduction = configService.isProdEnvironment(config);
+  const port = isProduction ? process.env.PORT! : config.PORT;
 
   // Initialize the socket server with our HTTP server
   socketServer.initialize(httpServer);
@@ -23,6 +23,7 @@ async function initializeApplication() {
     : await import("vite").then((vite) =>
         vite.createServer({
           server: { middlewareMode: true },
+          appType: "custom",
         }),
       );
 
@@ -57,7 +58,8 @@ async function initializeApplication() {
   // handle SSR requests
   app.all("*", remixHandler);
 
-  const port = isProduction ? process.env.PORT! : config.PORT;
+  // For prod process.env.PORT is set by EC2
+  console.log("PORT BEING USED BY HTTPSERVER:", port);
   httpServer.listen(port, () =>
     console.log(`Express server listening at http://localhost:${port}`),
   );
