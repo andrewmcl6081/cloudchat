@@ -1,0 +1,103 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - production-prep
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 891377287589.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: cloudchat
+  ASG_NAME: CloudChat-ASG
+  LAUNCH_TEMPLATE_NAME: CloudChat-LT
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image
+        run: |
+          # Build image with commit SHA and latest tags
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          # Push both tags to ECR
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Update Launch Template
+        run: |
+          USER_DATA=$(base64 -w 0 << 'EOF'
+          #!/bin/bash
+          
+          # Update and install Docker
+          sudo dnf update -y
+          sudo dnf install -y docker
+          sudo systemctl start docker
+          sudo systemctl enable docker
+
+          # Add ec2-user to the Docker group
+          sudo usermod -aG docker ec2-user
+
+          # Login to ECR
+          sudo -u ec2-user bash << 'EOC'
+          newgrp docker
+          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+
+          # Get database credentials from Secrets Manager
+          echo "Fetching database credentials from Secrets Manager..."
+          DB_SECRET=$(aws secretsmanager get-secret-value --secret-id prod/cloudchat/db --query 'SecretString' --output text)
+          DATABASE_URL=$(echo $DB_SECRET | jq -r '.DATABASE_URL')
+
+          # Stop and remove existing container if it exists
+          docker rm -f cloudchat || true
+
+          # Pull and run the container
+          echo "Starting application container..."
+          docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+          docker run -d \
+            --name cloudchat \
+            -p 3000:3000 \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e NODE_ENV=production \
+            --restart unless-stopped \
+            ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+          EOC
+          EOF
+          )
+
+          # Update Launch Template with new user data
+          LAUNCH_TEMPLATE_ID=$(aws ec2 describe-launch-templates \
+            --filters Name=tag:Name,Values=${LAUNCH_TEMPLATE_NAME} \
+            --query 'LaunchTemplates[0].LaunchTemplateId' \
+            --output text)
+
+          aws ec2 create-launch-template-version \
+            --launch-template-id $LAUNCH_TEMPLATE_ID \
+            --version-description "Update for commit ${GITHUB_SHA}" \
+            --source-version '$Latest' \
+            --launch-template-data "{
+              \"UserData\":\$USER_DATA\"
+            }"
+
+      - name: Start Instance Refresh
+        run: |
+          aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name ${ASG_NAME} \
+            --preferences "MinHealthyPercentage=50,InstanceWarmup=300" \
+            --strategy Rolling
