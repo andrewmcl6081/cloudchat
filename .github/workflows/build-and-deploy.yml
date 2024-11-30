@@ -91,9 +91,7 @@ jobs:
             --launch-template-id $LAUNCH_TEMPLATE_ID \
             --version-description "Update for commit ${GITHUB_SHA}" \
             --source-version '$Latest' \
-            --launch-template-data "{
-              \"UserData\":\$USER_DATA\"
-            }"
+            --launch-template-data "{\"UserData\":\"$USER_DATA\"}"
 
       - name: Start Instance Refresh
         run: |
