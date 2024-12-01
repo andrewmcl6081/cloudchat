@@ -22,7 +22,7 @@ async function initializeApplication() {
     const sslOptions = {
       key: fs.readFileSync(path.join(certsPath, "privkey.pem")),
       cert: fs.readFileSync(path.join(certsPath, "cert.pem")),
-      cs: fs.readFileSync(path.join(certsPath, "fullchain.pem")),
+      ca: fs.readFileSync(path.join(certsPath, "fullchain.pem")),
     };
 
     httpServer = createHttpsServer(sslOptions, app);
