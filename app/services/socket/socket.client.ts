@@ -103,8 +103,7 @@ export class SocketService {
         reconnectionDelayMax: 5000,
         timeout: 20000,
         transports: ["websocket", "polling"],
-        forceNew: false,
-        multiplex: true,
+        withCredentials: true,
       });
 
       // Set up event handlers for this socket

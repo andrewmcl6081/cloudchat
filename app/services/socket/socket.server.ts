@@ -66,7 +66,6 @@ export class SocketServer {
           credentials: true,
         },
         path: "/socket.io",
-        allowEIO3: true,
         pingInterval: 25000,
         pingTimeout: 20000,
         connectTimeout: 20000,
