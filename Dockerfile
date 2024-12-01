@@ -37,22 +37,11 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 
 # Create and set up the start.sh script
-RUN echo '#!/bin/sh \
-echo "=== Starting application setup ===" && \
-echo "Checking DATABASE_URL..." && \
-if [ -z "$DATABASE_URL" ]; then \
-  echo "ERROR: DATABASE_URL is not set" && \
-  exit 1; \
-fi && \
-echo "Generating Prisma Client..." && \
-npx prisma generate && \
-echo "Running database migrations..." && \
-npx prisma migrate deploy && \
-echo "Starting Remix application..." && \
-npm run start' > ./start.sh && chmod +x ./start.sh
+COPY deploy/start.sh /usr/src/app/start.sh
+RUN chmod +x /usr/src/app/start.sh
 
 # Expose the application port
 EXPOSE 3000
 
 # Start the application using the script
-CMD ["./start.sh"]
+CMD ["/usr/src/app/start.sh"]
