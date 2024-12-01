@@ -1,4 +1,5 @@
-import { createServer } from "http";
+import { createServer as createHttpServer } from "http";
+import { createServer as createHttpsServer } from "https";
 import { createRequestHandler } from "@remix-run/express";
 import compression from "compression";
 import express from "express";
@@ -7,13 +8,27 @@ import { socketServer } from "../services/socket/socket.server";
 import { ServerBuild } from "@remix-run/node";
 import { configService } from "~/services/config/environment.server";
 import path from "path";
+import fs from "fs";
 
 async function initializeApplication() {
   const app = express();
-  const httpServer = createServer(app);
   const config = await configService.getConfig();
   const isProduction = configService.isProdEnvironment(config);
   const port = isProduction ? process.env.PORT! : config.PORT;
+  const certsPath = path.resolve(__dirname, "../../certificates");
+
+  let httpServer;
+  if (isProduction) {
+    const sslOptions = {
+      key: fs.readFileSync(path.join(certsPath, "privkey.pem")),
+      cert: fs.readFileSync(path.join(certsPath, "cert.pem")),
+      cs: fs.readFileSync(path.join(certsPath, "fullchain.pem")),
+    };
+
+    httpServer = createHttpsServer(sslOptions, app);
+  } else {
+    httpServer = createHttpServer(app);
+  }
 
   // Initialize the socket server with our HTTP server
   socketServer.initialize(httpServer);

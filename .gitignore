@@ -6,3 +6,5 @@ node_modules
 .env*
 
 /cloudchat-local-dev-key.json
+
+/certificates

@@ -36,6 +36,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 
+# Copy SSL certificates
+COPY certificates/ /etc/ssl/certs/cloudchat
+
+# Ensure certificates are redable and secure
+RUN chmod -R 600 /etc/ssl/certs/cloudchat
+
+# Start the application as the root user
+USER root
+
 # Create and set up the start.sh script
 COPY deploy/start.sh /usr/src/app/start.sh
 RUN chmod +x /usr/src/app/start.sh
