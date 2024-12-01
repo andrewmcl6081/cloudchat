@@ -44,13 +44,13 @@ export default function App() {
             redirect_uri: data.env.AUTH0_CALLBACK_URL,
           }}
         >
-          <LogoutProvider>
-            <SocketProvider>
+          <SocketProvider>
+            <LogoutProvider>
               <MessagesProvider>
                 <Outlet />
               </MessagesProvider>
-            </SocketProvider>
-          </LogoutProvider>
+            </LogoutProvider>
+          </SocketProvider>
         </Auth0Provider>
         <ScrollRestoration />
         <Scripts />

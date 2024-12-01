@@ -93,7 +93,7 @@ export class SocketService {
       }
 
       // Create new socket connection
-      this.socket = io(window.location.origin, {
+      this.socket = io("wss://cloudchatapp.com", {
         auth,
         path: "/socket.io",
         autoConnect: true,
