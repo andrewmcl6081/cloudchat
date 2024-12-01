@@ -92,8 +92,12 @@ export class SocketService {
         this.socket = null;
       }
 
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host;
+      const url = `${protocol}//${host}`;
+
       // Create new socket connection
-      this.socket = io("http://cloudchatapp.com", {
+      this.socket = io(url, {
         auth,
         path: "/socket.io",
         autoConnect: true,
@@ -103,7 +107,7 @@ export class SocketService {
         reconnectionDelayMax: 5000,
         timeout: 20000,
         transports: ["websocket", "polling"],
-        withCredentials: true,
+        secure: true,
       });
 
       // Set up event handlers for this socket
