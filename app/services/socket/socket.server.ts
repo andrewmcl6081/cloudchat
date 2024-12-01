@@ -61,7 +61,7 @@ export class SocketServer {
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
         cors: {
-          origin: ["http://www.cloudchatapp.com", "http://cloudchatapp.com"],
+          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
           methods: ["GET", "POST"],
           credentials: true,
         },
