@@ -13,12 +13,4 @@ export default defineConfig({
     }),
     tsconfigPaths(),
   ],
-  server: {
-    host: "0.0.0.0",
-    strictPort: true,
-    port: Number(process.env.PORT2),
-    hmr: {
-      clientPort: Number(process.env.PORT2),
-    },
-  },
 });
