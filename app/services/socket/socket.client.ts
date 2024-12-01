@@ -107,6 +107,7 @@ export class SocketService {
         reconnectionDelayMax: 5000,
         timeout: 20000,
         transports: ["websocket", "polling"],
+        withCredentials: true,
         secure: true,
       });
 
