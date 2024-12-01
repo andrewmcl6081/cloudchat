@@ -61,10 +61,12 @@ export class SocketServer {
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
         cors: {
-          origin: env.DOMAIN,
+          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
           methods: ["GET", "POST"],
           credentials: true,
         },
+        path: "/socket.io",
+        allowEIO3: true,
         pingInterval: 25000,
         pingTimeout: 20000,
         connectTimeout: 20000,

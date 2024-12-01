@@ -95,6 +95,7 @@ export class SocketService {
       // Create new socket connection
       this.socket = io(window.location.origin, {
         auth,
+        path: "/socket.io",
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
