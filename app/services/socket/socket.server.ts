@@ -57,11 +57,11 @@ export class SocketServer {
 
     const env = await configService.getConfig();
     this.log("connection", "Initializing SocketServer...");
-    console.log("ENV.DOMAIN:", env.DOMAIN);
+
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
         cors: {
-          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
+          origin: ["http://www.cloudchatapp.com", "http://cloudchatapp.com"],
           methods: ["GET", "POST"],
           credentials: true,
         },
