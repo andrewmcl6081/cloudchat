@@ -26,6 +26,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Create SSL certificates directory
+        run: mkdir -p certificates
+
+      - name: Add SSL certificates from secrets
+        run: |
+          echo "${{ secrets.CERT_PEM }}" > certificates/cert.pem
+          echo "${{ secrets.CHAIN_PEM }}" > certificates/chain.pem
+          echo "${{ secrets.FULLCHAIN_PEM }}" > certificates/fullchain.pem
+          echo "${{ secrets.PRIVKEY_PEM }}" > certificates/privkey.pem
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
