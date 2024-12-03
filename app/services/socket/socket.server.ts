@@ -60,16 +60,16 @@ export class SocketServer {
 
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
-        cors: {
-          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
-          methods: ["GET", "POST"],
-          credentials: true,
-        },
         path: "/socket.io",
         pingInterval: 25000,
         pingTimeout: 20000,
         connectTimeout: 20000,
         transports: ["websocket", "polling"],
+        cors: {
+          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
+          methods: ["GET", "POST"],
+          credentials: true,
+        },
       });
 
       this.redisAdapter = new RedisSocketAdapter(global.__socketIO);

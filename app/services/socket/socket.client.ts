@@ -95,7 +95,7 @@ export class SocketService {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const host = window.location.host;
       const url = `${protocol}//${host}`;
-
+      console.log("URL:", url);
       // Create new socket connection
       this.socket = io(url, {
         auth,

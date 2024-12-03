@@ -17,7 +17,7 @@ async function initializeApplication() {
   const httpServer = createHttpServer(app);
 
   // Initialize the socket server with our HTTP server
-  socketServer.initialize(httpServer);
+  await socketServer.initialize(httpServer);
 
   const viteDevServer = isProduction
     ? undefined
