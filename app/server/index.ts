@@ -42,13 +42,6 @@ async function initializeApplication() {
   app.use(compression());
   app.disable("x-powered-by");
 
-  app.use("/socket.io", (req, res, next) => {
-    if (req.url?.startsWith("/socket.io")) {
-      return next();
-    }
-    return remixHandler(req, res, next);
-  });
-
   // handle asset requests
   if (viteDevServer) {
     app.use(viteDevServer.middlewares);

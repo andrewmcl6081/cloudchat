@@ -20,4 +20,4 @@ npx prisma migrate deploy
 
 # Start the application
 echo "Starting application..."
-npm run start
+npx tsx ./app/server/indet.ts
