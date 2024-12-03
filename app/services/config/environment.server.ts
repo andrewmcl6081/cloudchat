@@ -27,12 +27,12 @@ class ConfigService {
 
   private async loadDevEnvironment(): Promise<AppConfig> {
     // Load .env.development
-    const envFile =
-      process.env.SERVER_LABEL === "Server2"
-        ? ".env.development2"
-        : ".env.development";
+    // const envFile =
+    //   process.env.SERVER_LABEL === "Server2"
+    //     ? ".env.development2"
+    //     : ".env.development";
 
-    const envPath = path.resolve(process.cwd(), envFile);
+    const envPath = path.resolve(process.cwd(), ".env.development");
     const result = dotenv.config({ path: envPath });
 
     if (result.error) {
