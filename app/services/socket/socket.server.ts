@@ -66,7 +66,7 @@ export class SocketServer {
         connectTimeout: 20000,
         transports: ["websocket", "polling"],
         cors: {
-          origin: ["https://cloudchatapp.com", "https://www.cloudchatapp.com"],
+          origin: "*",
           methods: ["GET", "POST"],
         },
       });
