@@ -63,6 +63,13 @@ async function initializeApplication() {
   app.use(express.static("../../build/client", { maxAge: "1h" }));
   app.use(morgan("tiny"));
 
+  app.use((req, res, next) => {
+    if (req.url.includes("/socket.io")) {
+      return next(); // Ensure requests containing /socket.io are passed to the WebSocket handler
+    }
+    next();
+  });
+
   // handle SSR requests
   app.all("*", remixHandler);
 
