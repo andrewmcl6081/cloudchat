@@ -60,13 +60,13 @@ export class SocketServer {
 
     if (!global.__socketIO) {
       global.__socketIO = new Server(httpServer, {
-        path: "/socket.io",
+        path: "/socket.io/",
         pingInterval: 25000,
         pingTimeout: 20000,
         connectTimeout: 20000,
         transports: ["websocket", "polling"],
         cors: {
-          origin: ["https://www.cloudchatapp.com", "https://cloudchatapp.com"],
+          origin: ["https://cloudchatapp.com", "https://www.cloudchatapp.com"],
           methods: ["GET", "POST"],
           credentials: true,
         },
