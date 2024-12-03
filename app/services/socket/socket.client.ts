@@ -97,19 +97,22 @@ export class SocketService {
       const url = `${protocol}//${host}`;
 
       // Create new socket connection
-      this.socket = io("https://cloudchatapp.com", {
-        auth,
-        path: "/socket.io/",
-        autoConnect: true,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        secure: true,
-      });
+      this.socket = io(
+        "https://cloudchat-LB-1234661225.us-east-1.elb.amazonaws.com",
+        {
+          auth,
+          path: "/socket.io/",
+          autoConnect: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 20000,
+          transports: ["websocket", "polling"],
+          withCredentials: true,
+          secure: true,
+        },
+      );
 
       // Set up event handlers for this socket
       this.setupEventHandlers();

@@ -68,7 +68,6 @@ export class SocketServer {
         cors: {
           origin: ["https://cloudchatapp.com", "https://www.cloudchatapp.com"],
           methods: ["GET", "POST"],
-          credentials: true,
         },
       });
 
