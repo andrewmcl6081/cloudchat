@@ -17,14 +17,7 @@ async function initializeApplication() {
   const httpServer = createHttpServer(app);
 
   // Initialize the socket server with our HTTP server
-  const io = await socketServer.initialize(httpServer);
-
-  io.on("connection", (socket) => {
-    console.log("A user connected");
-    socket.on("disconnect", () => {
-      console.log("A user disconnected");
-    });
-  });
+  await socketServer.initialize(httpServer);
 
   const viteDevServer = isProduction
     ? undefined
@@ -61,14 +54,7 @@ async function initializeApplication() {
   }
 
   app.use(express.static("../../build/client", { maxAge: "1h" }));
-  app.use(morgan("tiny"));
-
-  app.use((req, res, next) => {
-    if (req.url.includes("/socket.io")) {
-      return next(); // Ensure requests containing /socket.io are passed to the WebSocket handler
-    }
-    next();
-  });
+  app.use(morgan("dev"));
 
   // handle SSR requests
   app.all("*", remixHandler);
