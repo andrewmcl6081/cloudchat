@@ -8,7 +8,7 @@
     "dev": "tsx ./app/server/index.ts",
     "dev-multi": "tsx ./app/scripts/dev-multi.ts",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
-    "start": "DEBUG=remix* remix-serve ./build/server/index.js",
+    "start": "DEBUG=* remix-serve ./build/server/index.js",
     "typecheck": "tsc"
   },
   "dependencies": {
