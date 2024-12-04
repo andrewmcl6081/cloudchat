@@ -49,7 +49,7 @@ export default function Dashboard() {
   return (
     <RequireAuth>
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-black shadow">
+        <nav className="bg-white shadow">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-16 justify-between">
               <div className="flex items-center">

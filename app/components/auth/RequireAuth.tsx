@@ -9,7 +9,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate("/login");
+      navigate("/");
     }
   }, [isLoading, isAuthenticated, navigate, error]);
 
