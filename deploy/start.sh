@@ -20,4 +20,4 @@ npx prisma migrate deploy
 
 # Start the application
 echo "Starting application..."
-npx tsx /server/index.ts
+npx tsx app/server/index.ts

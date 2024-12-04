@@ -31,6 +31,7 @@ export class RedisSocketAdapter {
 
     try {
       const config = await redisConfig.getConfig();
+      console.log("CONFIG:", config);
       this.log("redis", "Initializing with config", {
         host: config.host,
         port: config.port,

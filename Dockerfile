@@ -12,6 +12,7 @@ COPY package*.json ./
 
 # Install all dependencies (including dev dependencies)
 RUN npm ci
+RUN npm install -g tsx
 
 # Copy source files
 COPY . .
@@ -54,4 +55,4 @@ RUN chmod +x /usr/src/app/start.sh
 EXPOSE 3000
 
 # Start the application using the script
-CMD ["tail", "-f", "/dev/null"]
+CMD ["/usr/src/app/start.sh"]
