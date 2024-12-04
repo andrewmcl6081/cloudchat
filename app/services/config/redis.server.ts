@@ -43,18 +43,20 @@ class RedisConfigService {
 
       let redisUrl;
       try {
-        redisUrl = new URL(config.REDIS_ENDPOINT);
+        const cleanUrl = config.REDIS_ENDPOINT.replace("redis://", "");
+        const [hostWithPort, ...rest] = cleanUrl.split("/");
+        const [host, port] = hostWithPort.split(":");
+
+        // Production configuration
+        this.config = {
+          host,
+          port: parseInt(port || "6379", 10),
+          tls: true,
+          password: config.REDIS_AUTH_TOKEN,
+        };
       } catch (error) {
         throw new Error(`Invalid REDIS_ENDPOINT: ${config.REDIS_ENDPOINT}`);
       }
-
-      // Production configuration
-      this.config = {
-        host: redisUrl.hostname,
-        port: parseInt(redisUrl.port || "6379", 10),
-        tls: true,
-        password: config.REDIS_AUTH_TOKEN,
-      };
     } else {
       // Development configuration
       console.log("CONFIG REDIS SERVER:", config.REDIS_PORT!);
