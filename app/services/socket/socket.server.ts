@@ -55,7 +55,6 @@ export class SocketServer {
       return global.__socketIO!;
     }
 
-    const env = await configService.getConfig();
     this.log("connection", "Initializing SocketServer...");
 
     if (!global.__socketIO) {
@@ -66,7 +65,7 @@ export class SocketServer {
         connectTimeout: 20000,
         transports: ["websocket", "polling"],
         cors: {
-          origin: "*",
+          origin: ["http://localhost:5173"],
           methods: ["GET", "POST"],
         },
       });

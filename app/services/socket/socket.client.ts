@@ -97,7 +97,7 @@ export class SocketService {
       const url = `${protocol}//${host}`;
 
       // Create new socket connection
-      this.socket = io("https://cloudchatapp.com", {
+      this.socket = io(url, {
         auth,
         path: "/socket.io/",
         autoConnect: true,
