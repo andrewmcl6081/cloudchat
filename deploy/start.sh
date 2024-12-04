@@ -16,7 +16,6 @@ npx prisma generate
 
 # Apply Prisma migrations
 echo "Applying Prisma Migrations..."
-npx prisma migrate reset --force --skip-seed
 npx prisma migrate deploy
 
 # Start the application

@@ -56,4 +56,3 @@ EXPOSE 3000
 
 # Start the application using the scripts
 CMD ["/usr/src/app/start.sh"]
-# CMD ["tail", "-f", "/dev/null"]
