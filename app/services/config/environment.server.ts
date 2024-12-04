@@ -81,6 +81,7 @@ class ConfigService {
         AUTH0_DOMAIN: secrets.AUTH0_DOMAIN,
         AUTH0_RETURN_TO_URL: secrets.AUTH0_RETURN_TO_URL,
         DOMAIN: secrets.DOMAIN,
+        PORT: secrets.PORT,
         REDIS_AUTH_TOKEN: secrets.REDIS_AUTH_TOKEN,
         REDIS_ENDPOINT: secrets.REDIS_ENDPOINT,
       };

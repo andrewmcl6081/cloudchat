@@ -91,7 +91,7 @@ async function initializeApplication() {
   const app = express();
   const config = await configService.getConfig();
   const isProduction = configService.isProdEnvironment(config);
-  const port = isProduction ? process.env.PORT! : config.PORT;
+  const port = parseInt(config.PORT);
   const MODE = isProduction ? "production" : "development";
 
   const httpServer = createHttpServer(app);

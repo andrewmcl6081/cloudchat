@@ -19,6 +19,7 @@ export interface ProductionConfig {
   AUTH0_CALLBACK_URL: string;
   AUTH0_DOMAIN: string;
   AUTH0_RETURN_TO_URL: string;
+  PORT: string;
   DOMAIN: string;
   REDIS_AUTH_TOKEN: string;
   REDIS_ENDPOINT: string;
