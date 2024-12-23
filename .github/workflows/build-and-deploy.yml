@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Build and Deploy!
 
 on:
   push:
@@ -26,6 +26,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Create SSL certificates directory
+        run: mkdir -p certificates
+
+      - name: Add SSL certificates from secrets
+        run: |
+          echo "${{ secrets.CERT_PEM }}" > certificates/cert.pem
+          echo "${{ secrets.CHAIN_PEM }}" > certificates/chain.pem
+          echo "${{ secrets.FULLCHAIN_PEM }}" > certificates/fullchain.pem
+          echo "${{ secrets.PRIVKEY_PEM }}" > certificates/privkey.pem
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -44,7 +54,7 @@ jobs:
         run: |
           USER_DATA=$(base64 -w 0 << 'EOF'
           #!/bin/bash
-          
+
           # Update and install Docker
           sudo dnf update -y
           sudo dnf install -y docker
@@ -57,26 +67,26 @@ jobs:
           # Login to ECR
           sudo -u ec2-user bash << 'EOC'
           newgrp docker
-          aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 891377287589.dkr.ecr.us-east-1.amazonaws.com
 
           # Get database credentials from Secrets Manager
           echo "Fetching database credentials from Secrets Manager..."
           DB_SECRET=$(aws secretsmanager get-secret-value --secret-id prod/cloudchat/db --query 'SecretString' --output text)
           DATABASE_URL=$(echo $DB_SECRET | jq -r '.DATABASE_URL')
-
+          echo "Using Docker image: 891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest"
           # Stop and remove existing container if it exists
           docker rm -f cloudchat || true
 
           # Pull and run the container
           echo "Starting application container..."
-          docker pull ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+          docker pull 891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest
           docker run -d \
             --name cloudchat \
             -p 3000:3000 \
             -e DATABASE_URL="$DATABASE_URL" \
             -e NODE_ENV=production \
             --restart unless-stopped \
-            ${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
+            891377287589.dkr.ecr.us-east-1.amazonaws.com/cloudchat:latest
           EOC
           EOF
           )
@@ -91,9 +101,7 @@ jobs:
             --launch-template-id $LAUNCH_TEMPLATE_ID \
             --version-description "Update for commit ${GITHUB_SHA}" \
             --source-version '$Latest' \
-            --launch-template-data "{
-              \"UserData\":\$USER_DATA\"
-            }"
+            --launch-template-data "{\"UserData\":\"$USER_DATA\"}"
 
       - name: Start Instance Refresh
         run: |

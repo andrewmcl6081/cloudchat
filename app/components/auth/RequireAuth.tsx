@@ -1,15 +1,20 @@
 import { useAuth0 } from "@auth0/auth0-react";
-import { Navigate } from "@remix-run/react";
+import { useNavigate } from "@remix-run/react";
+import { useEffect } from "react";
+import LoadingSpinner from "../LoadingSpinner";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading, error } = useAuth0();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate("/");
+    }
+  }, [isLoading, isAuthenticated, navigate, error]);
 
   if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return <LoadingSpinner fullScreen />;
   }
 
   return children;

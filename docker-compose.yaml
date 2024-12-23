@@ -1,0 +1,90 @@
+services:
+  app1:
+    build:
+      context: .
+      args:
+        - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cloudchat
+      dockerfile: Dockerfile
+    env_file:
+      - .env.development
+    ports:
+      - "${PORT}:${PORT}"
+      - "${PORT3}:${PORT3}"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cloudchat
+      - VITE_HMR_HOST=0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - cloudchat-network
+
+  app2:
+    build:
+      context: .
+      args:
+        - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cloudchat
+      dockerfile: Dockerfile
+    env_file:
+      - .env.development2
+    ports:
+      - "${PORT2}:${PORT2}"
+      - "${PORT4}:${PORT4}"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/cloudchat
+      - VITE_HMR_HOST=0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - cloudchat-network
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=cloudchat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudchat-network
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cloudchat-network
+
+networks:
+  cloudchat-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

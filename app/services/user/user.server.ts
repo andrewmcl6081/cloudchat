@@ -1,15 +1,15 @@
 import { db } from "~/services/db/index.server";
 import type { User } from "@prisma/client";
 
-// Handles all database operations related to users in your application. 
+// Handles all database operations related to users in your application.
 // It serves as an interface between your application and the user table
 // in your PostgreSQL database (accessed through Prisma)
 
 // Type for Auth0 user data we receive
 export type Auth0User = {
-  sub: string;      // Auth0's unique identifier for the user
-  email: string;    // User's email address
-  name?: string;    // Optional user's name
+  sub: string; // Auth0's unique identifier for the user
+  email: string; // User's email address
+  name?: string; // Optional user's name
   picture?: string; // Optional profile picture URL
 };
 
@@ -21,19 +21,36 @@ export class UserService {
   static async findOrCreate(auth0User: Auth0User): Promise<User> {
     return db.user.upsert({
       // Look for existing user by Auth0 ID
-      where: { 
-        auth0Id: auth0User.sub 
+      where: {
+        auth0Id: auth0User.sub,
       },
+
       // If user exists, update their information
       update: {
         email: auth0User.email,
         displayName: auth0User.name,
+        picture: auth0User.picture,
       },
+
       // If user doesn't exist, create new record
       create: {
         auth0Id: auth0User.sub,
         email: auth0User.email,
         displayName: auth0User.name,
+        picture: auth0User.picture,
+      },
+    });
+  }
+
+  static async getAllUsers(currentUserId: string) {
+    return await db.user.findMany({
+      where: {
+        auth0Id: {
+          not: currentUserId,
+        },
+      },
+      orderBy: {
+        email: "asc",
       },
     });
   }
@@ -72,37 +89,16 @@ export class UserService {
    * Updates a user's profile information
    * Useful for profile editing features
    */
-  static async updateProfile(userId: string, data: {
-    displayName?: string;
-    // Add other updatable fields here
-  }): Promise<User> {
+  static async updateProfile(
+    userId: string,
+    data: {
+      displayName?: string;
+      // Add other updatable fields here
+    },
+  ): Promise<User> {
     return db.user.update({
       where: { id: userId },
       data,
-    });
-  }
-
-  /**
-   * Searches for users by name or email
-   * Useful for user discovery/search features
-   * Excludes the current user from results
-   */
-  static async searchUsers(
-    query: string,
-    currentUserId: string,
-    limit: number = 10
-  ): Promise<User[]> {
-    return db.user.findMany({
-      where: {
-        OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          { displayName: { contains: query, mode: 'insensitive' } },
-        ],
-        AND: {
-          id: { not: currentUserId }, // Exclude current user
-        },
-      },
-      take: limit,
     });
   }
 
@@ -111,13 +107,13 @@ export class UserService {
    * Useful for displaying conversation participants
    */
   static async getConversationParticipants(
-    conversationId: string
+    conversationId: string,
   ): Promise<User[]> {
     const participants = await db.conversationParticipant.findMany({
       where: { conversationId },
       include: { user: true },
     });
-    return participants.map(p => p.user);
+    return participants.map((p) => p.user);
   }
 
   /**

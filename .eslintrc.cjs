@@ -1,9 +1,3 @@
-/**
- * This is intended to be a basic starting point for linting in your app.
- * It relies on recommended configs out of the box for simplicity, but you can
- * and should modify this configuration to best suit your team's needs.
- */
-
 /** @type {import('eslint').Linter.Config} */
 module.exports = {
   root: true,
@@ -18,14 +12,21 @@ module.exports = {
     browser: true,
     commonjs: true,
     es6: true,
+    node: true,
   },
-  ignorePatterns: ["!**/.server", "!**/.client"],
+  ignorePatterns: ["build/", "node_modules/"],
 
   // Base config
-  extends: ["eslint:recommended"],
+  extends: ["eslint:recommended", "plugin:prettier/recommended"],
+
+  plugins: ["prettier"],
+
+  rules: {
+    "prettier/prettier": "error",
+  },
 
   overrides: [
-    // React
+    // React and Remix
     {
       files: ["**/*.{js,jsx,ts,tsx}"],
       plugins: ["react", "jsx-a11y"],
@@ -48,9 +49,13 @@ module.exports = {
           typescript: {},
         },
       },
+      rules: {
+        // Enforce JSX in TSX files only
+        "react/jsx-filename-extension": [1, { extensions: [".tsx"] }],
+      },
     },
 
-    // Typescript
+    // TypeScript
     {
       files: ["**/*.{ts,tsx}"],
       plugins: ["@typescript-eslint", "import"],
@@ -71,13 +76,20 @@ module.exports = {
         "plugin:import/recommended",
         "plugin:import/typescript",
       ],
+      rules: {
+        // Disable explicit function return types for flexibility
+        "@typescript-eslint/explicit-function-return-type": "off",
+      },
     },
 
-    // Node
+    // Node-specific rules for server files
     {
-      files: [".eslintrc.cjs"],
+      files: [".eslintrc.cjs", "server/**/*.{js,ts}"],
       env: {
         node: true,
+      },
+      rules: {
+        "no-console": "off", // Allow console in server files
       },
     },
   ],
